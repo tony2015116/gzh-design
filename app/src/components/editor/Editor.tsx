@@ -1,0 +1,158 @@
+import React from 'react';
+import { loadUploadMode, loadR2Config, loadCdnConfig, compressImageToBlob, uploadImageToR2, uploadImageToCdn } from '../../services/imageUpload';
+
+interface EditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  editorRef?: React.Ref<HTMLTextAreaElement>;
+  onScroll?: React.UIEventHandler<HTMLTextAreaElement>;
+}
+
+export const Editor: React.FC<EditorProps> = ({ value, onChange, editorRef, onScroll }) => {
+
+  /** Insert text at cursor position and return new cursor offset */
+  const insertAtCursor = (textarea: HTMLTextAreaElement, text: string, start: number, end: number) => {
+    const before = textarea.value.substring(0, start);
+    const after = textarea.value.substring(end);
+    const newValue = before + text + after;
+    onChange(newValue);
+    setTimeout(() => {
+      textarea.focus();
+      const pos = start + text.length;
+      textarea.setSelectionRange(pos, pos);
+    }, 0);
+    return before + text + after;
+  };
+
+  /** Replace a placeholder string in the current textarea value */
+  const replacePlaceholder = (placeholder: string, replacement: string) => {
+    // Read the latest value from the underlying textarea DOM element
+    const ta = typeof editorRef === 'object' && editorRef?.current ? editorRef.current : null;
+    const currentValue = ta ? ta.value : value;
+    const newValue = currentValue.replace(placeholder, replacement);
+    onChange(newValue);
+  };
+
+  /** Base64 fallback: compress and embed inline */
+  const handleBase64Fallback = (file: File, textarea: HTMLTextAreaElement, start: number, end: number) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const MAX_WIDTH = 1000;
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          const id = Math.random().toString(36).substring(2, 8);
+          const refName = `image-${id}`;
+          const insertText = `![截图][${refName}]\n`;
+          const currentRealValue = textarea.value;
+          const newValue = currentRealValue.substring(0, start) +
+            insertText +
+            currentRealValue.substring(end) +
+            `\n\n[${refName}]: ${dataUrl}\n`;
+          onChange(newValue);
+          setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(start + insertText.length, start + insertText.length);
+          }, 0);
+        }
+      };
+      if (event.target?.result) img.src = event.target.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  /** Upload via CDN (R2 or custom) with placeholder + fallback */
+  const handleCdnUpload = (
+    file: File,
+    textarea: HTMLTextAreaElement,
+    start: number,
+    end: number,
+    uploadFn: (blob: Blob) => Promise<string>,
+  ) => {
+    const placeholderId = Math.random().toString(36).substring(2, 8);
+    const placeholder = `![上传中...](uploading-${placeholderId})`;
+    insertAtCursor(textarea, placeholder + '\n', start, end);
+
+    (async () => {
+      try {
+        const blob = await compressImageToBlob(file);
+        const remoteUrl = await uploadFn(blob);
+        replacePlaceholder(placeholder, `![图片](${remoteUrl})`);
+      } catch (err: any) {
+        console.warn('Upload failed, falling back to base64:', err);
+        replacePlaceholder(placeholder + '\n', '');
+        handleBase64Fallback(file, textarea, start, end);
+      }
+    })();
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData.items;
+    let imageItem: DataTransferItem | null = null;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image/') === 0) {
+        imageItem = items[i];
+        break;
+      }
+    }
+    if (!imageItem) return;
+
+    e.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+
+    const textarea = e.currentTarget;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    const mode = loadUploadMode();
+
+    if (mode === 'r2') {
+      const r2Config = loadR2Config();
+      if (r2Config) {
+        handleCdnUpload(file, textarea, start, end, (blob) => uploadImageToR2(blob, r2Config));
+      } else {
+        handleBase64Fallback(file, textarea, start, end);
+      }
+    } else if (mode === 'custom') {
+      const cdnConfig = loadCdnConfig();
+      if (cdnConfig) {
+        handleCdnUpload(file, textarea, start, end, (blob) => uploadImageToCdn(blob, cdnConfig));
+      } else {
+        handleBase64Fallback(file, textarea, start, end);
+      }
+    } else {
+      handleBase64Fallback(file, textarea, start, end);
+    }
+  };
+
+  return (
+    <div className="h-[calc(100%-2.5rem)] w-full">
+      <textarea
+        ref={editorRef}
+        onScroll={onScroll}
+        onPaste={handlePaste}
+        className="w-full h-full p-6 text-gray-800 font-mono text-sm resize-none focus:outline-none focus:ring-0 !border-0"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="在此输入 Markdown..."
+        spellCheck={false}
+      />
+    </div>
+  );
+};

@@ -1,0 +1,22 @@
+# 依赖
+node_modules
+
+# 构建产物
+dist
+dist-ssr
+
+# wrangler 本地状态
+.wrangler
+
+# 日志
+*.log
+logs
+
+# 编辑器
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# 本地激活的环境配置（.env.example / .env.oss / .env.online 作为模板保留跟踪）
+.env

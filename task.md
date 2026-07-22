@@ -1,0 +1,7 @@
+- [x] Install `html-to-image` package
+- [x] Implement `src/services/imageExportService.ts`
+- [x] Implement `src/components/ui/ImageExportPanel.tsx`
+- [x] Update `src/views/TypesetterView.tsx` to integrate the export button and panel
+- [x] Test long image generation
+- [x] Test sliced image generation with different ratios
+- [x] Test image download functionality
