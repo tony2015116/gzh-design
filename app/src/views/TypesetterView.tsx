@@ -3,10 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import {
   BookOpen,
   Copy,
+  FileText,
+  ImageDown,
   ImagePlus,
   LogOut,
+  MessageSquareQuote,
   MonitorPlay,
   Settings,
+  Share2,
   User as UserIcon,
   Wand2,
 } from 'lucide-react';
@@ -15,6 +19,7 @@ import { getAITypesetMarkdown } from '../ai/formatter';
 import { Preview } from '../components/preview/Preview';
 import { CheatsheetModal } from '../components/ui/CheatsheetModal';
 import { DevIdentitySwitcher } from '../components/ui/DevIdentitySwitcher';
+import { HeaderMenu } from '../components/ui/HeaderMenu';
 import { InputPromptModal } from '../components/ui/InputPromptModal';
 import { IllustrationJobPanel } from '../components/ui/IllustrationJobPanel';
 import { IllustrationPlanModal } from '../components/ui/IllustrationPlanModal';
@@ -36,6 +41,7 @@ import {
   type DevIdentityRole,
 } from '../services/accessControl';
 import {
+  changePassword,
   fetchPresets,
   getCurrentUser,
   logout,
@@ -143,18 +149,23 @@ function TypesetterView() {
   const [showPresetNameModal, setShowPresetNameModal] = useState(false);
   const [presetNameInput, setPresetNameInput] = useState('');
   const [isSavingPreset, setIsSavingPreset] = useState(false);
-  const [showExportPanel, setShowExportPanel] = useState(false);
-  const [activeExportPlatform, setActiveExportPlatform] = useState<'xThread' | 'xArticle'>('xThread');
+  const [previewTab, setPreviewTab] = useState<'wechat' | 'xThread' | 'xArticle'>('wechat');
   const [xThreadExport, setXThreadExport] = useState<XThreadExport | null>(null);
   const [xArticleExport, setXArticleExport] = useState<XArticleExport | null>(null);
   const [showImageExportPanel, setShowImageExportPanel] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const canUseCloudPresets = isRealAuth && Boolean(authUser);
+  const canChangePassword = isRealAuth && Boolean(authUser);
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const isSyncingLeft = useRef(false);
   const isSyncingRight = useRef(false);
+  const scrollSyncRafRef = useRef<number | null>(null);
   const notifiedIllustrationJobsRef = useRef<Record<string, IllustrationJob['status']>>({});
 
   useEffect(() => {
@@ -269,24 +280,37 @@ function TypesetterView() {
     }
   };
 
-  const handleEditorScroll = () => {
-    if (isSyncingLeft.current) {
-      isSyncingLeft.current = false;
-      return;
+  useEffect(() => () => {
+    if (scrollSyncRafRef.current !== null) {
+      window.cancelAnimationFrame(scrollSyncRafRef.current);
     }
+  }, []);
 
-    const editor = editorRef.current;
-    const preview = previewScrollRef.current;
-    if (!editor || !preview) return;
+  const handleEditorScroll = () => {
+    // rAF 节流：一次滚动事件帧内只同步一次预览滚动位置
+    if (scrollSyncRafRef.current !== null) return;
 
-    const editorScrollableHeight = editor.scrollHeight - editor.clientHeight;
-    if (editorScrollableHeight <= 0) return;
+    scrollSyncRafRef.current = window.requestAnimationFrame(() => {
+      scrollSyncRafRef.current = null;
 
-    const percentage = editor.scrollTop / editorScrollableHeight;
-    const previewScrollableHeight = preview.scrollHeight - preview.clientHeight;
+      if (isSyncingLeft.current) {
+        isSyncingLeft.current = false;
+        return;
+      }
 
-    isSyncingRight.current = true;
-    preview.scrollTop = percentage * previewScrollableHeight;
+      const editor = editorRef.current;
+      const preview = previewScrollRef.current;
+      if (!editor || !preview) return;
+
+      const editorScrollableHeight = editor.scrollHeight - editor.clientHeight;
+      if (editorScrollableHeight <= 0) return;
+
+      const percentage = editor.scrollTop / editorScrollableHeight;
+      const previewScrollableHeight = preview.scrollHeight - preview.clientHeight;
+
+      isSyncingRight.current = true;
+      preview.scrollTop = percentage * previewScrollableHeight;
+    });
   };
 
   const handlePreviewScroll = () => {
@@ -376,16 +400,14 @@ function TypesetterView() {
   const handleCopyXThread = async () => {
     const nextExport = generateXThreadExport(markdown);
     setXThreadExport(nextExport);
-    setActiveExportPlatform('xThread');
-    setShowExportPanel(true);
+    setPreviewTab('xThread');
     await copyPlainText(nextExport.combinedText, '复制成功', `X Thread 文案已复制，共 ${nextExport.posts.length} 条。`);
   };
 
   const handleCopyXArticle = async () => {
     const nextExport = generateXArticleExport(markdown);
     setXArticleExport(nextExport);
-    setActiveExportPlatform('xArticle');
-    setShowExportPanel(true);
+    setPreviewTab('xArticle');
     await copyRichText(
       nextExport.combinedHtml,
       nextExport.combinedText,
@@ -549,6 +571,30 @@ function TypesetterView() {
     setPresets([]);
   };
 
+  const handleChangePassword = async () => {
+    if (!oldPassword || !newPassword) {
+      pushToast('error', '修改密码失败', '请填写旧密码和新密码。');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      pushToast('error', '修改密码失败', '两次输入的新密码不一致。');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await changePassword(oldPassword, newPassword);
+      pushToast('success', '密码已修改', '其他设备的登录状态已失效，本设备保持登录。');
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (error: any) {
+      pushToast('error', '修改密码失败', error.message || '请稍后重试。');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   const handleRefreshIllustrationJob = async () => {
     if (!lastIllustrationJob || import.meta.env.VITE_APP_MODE !== 'online') return;
 
@@ -594,23 +640,21 @@ function TypesetterView() {
     setShowSettings(false);
   };
 
-  const openThreadExportPanel = () => {
-    setXThreadExport((current) => current || generateXThreadExport(markdown));
-    setActiveExportPlatform('xThread');
-    setShowExportPanel(true);
-  };
-
-  const openArticleExportPanel = () => {
-    setXArticleExport((current) => current || generateXArticleExport(markdown));
-    setActiveExportPlatform('xArticle');
-    setShowExportPanel(true);
+  const handleSelectPreviewTab = (tab: 'wechat' | 'xThread' | 'xArticle') => {
+    if (tab === 'xThread') {
+      setXThreadExport((current) => current || generateXThreadExport(markdown));
+    }
+    if (tab === 'xArticle') {
+      setXArticleExport((current) => current || generateXArticleExport(markdown));
+    }
+    setPreviewTab(tab);
   };
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
       <ToastStack items={toastItems} onDismiss={dismissToast} />
 
-      <header className="z-10 flex h-14 flex-none items-center justify-between border-b border-gray-200 bg-white px-6 shadow-sm">
+      <header className="z-20 flex h-14 flex-none items-center justify-between border-b border-gray-200 bg-white px-6 shadow-sm">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
             <MonitorPlay className="h-5 w-5 text-emerald-600" />
@@ -697,9 +741,7 @@ function TypesetterView() {
         </div>
 
         <div className="flex items-center space-x-3">
-          {showDevIdentity ? (
-            <DevIdentitySwitcher value={devIdentityRole} onChange={handleDevIdentityChange} />
-          ) : authUser ? (
+          {authUser ? (
             <div className="mr-2 flex items-center space-x-2 rounded-full border border-gray-100 bg-gray-50 px-3 py-1">
               <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                 {authUser.role.toUpperCase()}
@@ -713,7 +755,7 @@ function TypesetterView() {
                 <LogOut className="h-4 w-4" />
               </button>
             </div>
-          ) : (
+          ) : isRealAuth ? (
             <button
               onClick={() => navigate('/login', { state: { from: '/' } })}
               className="mr-2 flex items-center space-x-1 rounded-full bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
@@ -722,7 +764,55 @@ function TypesetterView() {
               <UserIcon className="h-4 w-4" />
               <span>登录</span>
             </button>
-          )}
+          ) : null}
+
+          <HeaderMenu
+            label="AI 工具"
+            icon={<Wand2 className="mr-1.5 h-4 w-4" />}
+            buttonClassName="flex items-center rounded-full border border-amber-200 bg-amber-50 px-4 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100"
+            items={[
+              {
+                key: 'ai-typeset',
+                label: isTypesetting ? 'AI 排版中...' : 'AI 一键排版',
+                icon: <Wand2 className={`mr-2 h-4 w-4 text-amber-600 ${isTypesetting ? 'animate-spin' : ''}`} />,
+                disabled: isTypesetting,
+                onSelect: () => void handleAITypeset(),
+              },
+              {
+                key: 'illustration-plan',
+                label: isPlanningIllustration ? '分析配图中...' : '智能配图建议',
+                icon: <ImagePlus className={`mr-2 h-4 w-4 text-sky-600 ${isPlanningIllustration ? 'animate-pulse' : ''}`} />,
+                disabled: isPlanningIllustration,
+                onSelect: () => void handleIllustrationPlan(),
+              },
+            ]}
+          />
+
+          <HeaderMenu
+            label="更多导出"
+            icon={<Share2 className="mr-1.5 h-4 w-4" />}
+            buttonClassName="flex items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+            items={[
+              {
+                key: 'copy-x-thread',
+                label: '复制 X Thread',
+                icon: <MessageSquareQuote className="mr-2 h-4 w-4 text-sky-600" />,
+                onSelect: () => void handleCopyXThread(),
+              },
+              {
+                key: 'copy-x-article',
+                label: '复制 X Article',
+                icon: <FileText className="mr-2 h-4 w-4 text-violet-600" />,
+                onSelect: () => void handleCopyXArticle(),
+              },
+              {
+                key: 'export-image',
+                label: '导出图片',
+                icon: <ImageDown className="mr-2 h-4 w-4 text-pink-600" />,
+                onSelect: () => setShowImageExportPanel(true),
+              },
+            ]}
+          />
 
           {!isOnlineMode && (
             <button
@@ -735,45 +825,11 @@ function TypesetterView() {
           )}
 
           <button
-            onClick={handleAITypeset}
-            disabled={isTypesetting}
-            className="flex items-center rounded-full border border-amber-200 bg-amber-50 px-4 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
-          >
-            <Wand2 className={`mr-1.5 h-4 w-4 ${isTypesetting ? 'animate-spin' : ''}`} />
-            {isTypesetting ? 'AI 排版中...' : 'AI 一键排版'}
-          </button>
-
-          <button
-            onClick={handleIllustrationPlan}
-            disabled={isPlanningIllustration}
-            className="flex items-center rounded-full border border-sky-200 bg-sky-50 px-4 py-1.5 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100 disabled:opacity-50"
-          >
-            <ImagePlus className={`mr-1.5 h-4 w-4 ${isPlanningIllustration ? 'animate-pulse' : ''}`} />
-            {isPlanningIllustration ? '分析配图中...' : '智能配图建议'}
-          </button>
-
-          <button
             onClick={handleCopy}
             className="flex items-center rounded-full bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700"
           >
             <Copy className="mr-1.5 h-4 w-4" />
             复制到公众号
-          </button>
-
-          <button
-            onClick={handleCopyXThread}
-            className="flex items-center rounded-full border border-sky-200 bg-sky-50 px-4 py-1.5 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100"
-          >
-            <Copy className="mr-1.5 h-4 w-4" />
-            复制 X Thread
-          </button>
-
-          <button
-            onClick={handleCopyXArticle}
-            className="flex items-center rounded-full border border-violet-200 bg-violet-50 px-4 py-1.5 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-100"
-          >
-            <Copy className="mr-1.5 h-4 w-4" />
-            复制 X Article
           </button>
         </div>
       </header>
@@ -800,47 +856,97 @@ function TypesetterView() {
           </div>
         </section>
 
-        <section className="flex h-full w-1/2 flex-col bg-[#f6f7f9]">
-          <div className="z-10 flex h-10 flex-none items-center justify-between border-b border-transparent bg-white px-4 text-xs font-semibold uppercase tracking-wider text-gray-500 shadow-sm">
-            <span>预览效果（宽度 677px）</span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowImageExportPanel(true)}
-                className="rounded-full border border-pink-200 bg-pink-50 px-3 py-1 text-[11px] font-semibold normal-case tracking-normal text-pink-700 transition-colors hover:bg-pink-100"
-              >
-                导出图片
-              </button>
-              <button
-                onClick={openThreadExportPanel}
-                className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold normal-case tracking-normal text-sky-700 transition-colors hover:bg-sky-100"
-              >
-                查看 X Thread
-              </button>
-              <button
-                onClick={openArticleExportPanel}
-                className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold normal-case tracking-normal text-violet-700 transition-colors hover:bg-violet-100"
-              >
-                查看 X Article
-              </button>
+        <section className="flex h-full w-1/2 flex-col bg-gray-100">
+          <div className="z-10 flex h-10 flex-none items-center justify-between border-b border-transparent bg-white px-4 shadow-sm">
+            <div className="flex items-center gap-1">
+              {([
+                { key: 'wechat' as const, label: '公众号' },
+                { key: 'xThread' as const, label: 'X Thread' },
+                { key: 'xArticle' as const, label: 'X Article' },
+              ]).map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => handleSelectPreviewTab(tab.key)}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                    previewTab === tab.key
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
+            {previewTab === 'wechat' && (
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                宽度 677px
+              </span>
+            )}
           </div>
-          <div
-            ref={previewScrollRef}
-            onScroll={handlePreviewScroll}
-            className="flex-1 overflow-auto p-4 md:p-8"
-          >
+
+          {previewTab === 'wechat' ? (
             <div
-              style={{ width: '677px', margin: '0 auto' }}
-              className="min-h-[800px] flex-shrink-0 bg-white shadow-xl outline outline-1 outline-gray-200/50"
+              ref={previewScrollRef}
+              onScroll={handlePreviewScroll}
+              className="flex-1 overflow-auto p-4 md:p-8"
             >
-              <Preview
-                markdown={markdown}
-                theme={activeTheme}
-                layoutStyle={activeLayoutStyle}
-                imageStyle={activeImageStyle}
+              <div
+                style={{ width: '677px', margin: '0 auto' }}
+                className="min-h-[800px] flex-shrink-0 overflow-hidden rounded-xl bg-white shadow-xl outline outline-1 outline-gray-200/50"
+              >
+                <Preview
+                  markdown={markdown}
+                  theme={activeTheme}
+                  layoutStyle={activeLayoutStyle}
+                  imageStyle={activeImageStyle}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-hidden">
+              <PlatformExportPanel
+                threadExport={xThreadExport}
+                articleExport={xArticleExport}
+                activePlatform={previewTab}
+                onCopyThreadAll={() => {
+                  if (!xThreadExport) return;
+                  void copyPlainText(xThreadExport.combinedText, '复制成功', `X Thread 文案已复制，共 ${xThreadExport.posts.length} 条。`);
+                }}
+                onCopyThreadPost={(content, index) => {
+                  void copyPlainText(content, '复制成功', `第 ${index} 条 Thread 已复制。`);
+                }}
+                onCopyArticleTitle={() => {
+                  if (!xArticleExport) return;
+                  void copyPlainText(xArticleExport.title, '复制成功', 'X Article 标题已复制。');
+                }}
+                onCopyArticleBody={() => {
+                  if (!xArticleExport) return;
+                  void copyRichText(
+                    xArticleExport.bodyRichHtml,
+                    xArticleExport.body,
+                    '复制成功',
+                    'X Article 正文已以富文本形式复制。',
+                  );
+                }}
+                onCopyArticleAll={() => {
+                  if (!xArticleExport) return;
+                  void copyRichText(
+                    xArticleExport.combinedHtml,
+                    xArticleExport.combinedText,
+                    '复制成功',
+                    'X Article 全文已以富文本形式复制。',
+                  );
+                }}
+                onCopyArticleCodeBlock={(content, language, index) => {
+                  void copyPlainText(
+                    content,
+                    '复制成功',
+                    `第 ${index} 段 ${language || 'text'} 代码已复制，可直接粘贴到 X 的“插入代码”块。`,
+                  );
+                }}
               />
             </div>
-          </div>
+          )}
         </section>
       </main>
 
@@ -848,6 +954,51 @@ function TypesetterView() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-md animate-in fade-in duration-200">
           <div className="m-4 w-[480px] max-w-full rounded-[20px] bg-white/95 p-8 shadow-2xl ring-1 ring-black/5 animate-in zoom-in-95 duration-200">
             <h3 className="mb-6 text-xl font-bold text-gray-900">系统设置</h3>
+
+            {showDevIdentity && (
+              <div className="mb-5">
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">调试身份</label>
+                <DevIdentitySwitcher value={devIdentityRole} onChange={handleDevIdentityChange} />
+              </div>
+            )}
+
+            {canChangePassword && (
+              <div className="mb-5">
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">修改密码</label>
+                <div className="space-y-2">
+                  <input
+                    type="password"
+                    value={oldPassword}
+                    onChange={(event) => setOldPassword(event.target.value)}
+                    placeholder="旧密码"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    placeholder="新密码（至少 8 位，需包含字母和数字）"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <input
+                    type="password"
+                    value={confirmNewPassword}
+                    onChange={(event) => setConfirmNewPassword(event.target.value)}
+                    placeholder="确认新密码"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleChangePassword}
+                      disabled={isChangingPassword}
+                      className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-md transition-all hover:bg-emerald-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isChangingPassword ? '提交中…' : '确认修改'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="mb-5 flex space-x-1 rounded-lg bg-gray-100 p-1">
               <button
@@ -1069,51 +1220,6 @@ function TypesetterView() {
           onApply={handleApplyIllustrationResult}
           isApplying={isApplyingIllustrationResult}
           onClose={() => setLastIllustrationJob(null)}
-        />
-      )}
-      {showExportPanel && (
-        <PlatformExportPanel
-          threadExport={xThreadExport}
-          articleExport={xArticleExport}
-          activePlatform={activeExportPlatform}
-          onSwitch={setActiveExportPlatform}
-          onClose={() => setShowExportPanel(false)}
-          onCopyThreadAll={() => {
-            if (!xThreadExport) return;
-            void copyPlainText(xThreadExport.combinedText, '复制成功', `X Thread 文案已复制，共 ${xThreadExport.posts.length} 条。`);
-          }}
-          onCopyThreadPost={(content, index) => {
-            void copyPlainText(content, '复制成功', `第 ${index} 条 Thread 已复制。`);
-          }}
-          onCopyArticleTitle={() => {
-            if (!xArticleExport) return;
-            void copyPlainText(xArticleExport.title, '复制成功', 'X Article 标题已复制。');
-          }}
-          onCopyArticleBody={() => {
-            if (!xArticleExport) return;
-            void copyRichText(
-              xArticleExport.bodyRichHtml,
-              xArticleExport.body,
-              '复制成功',
-              'X Article 正文已以富文本形式复制。',
-            );
-          }}
-          onCopyArticleAll={() => {
-            if (!xArticleExport) return;
-            void copyRichText(
-              xArticleExport.combinedHtml,
-              xArticleExport.combinedText,
-              '复制成功',
-              'X Article 全文已以富文本形式复制。',
-            );
-          }}
-          onCopyArticleCodeBlock={(content, language, index) => {
-            void copyPlainText(
-              content,
-              '复制成功',
-              `第 ${index} 段 ${language || 'text'} 代码已复制，可直接粘贴到 X 的“插入代码”块。`,
-            );
-          }}
         />
       )}
       {showImageExportPanel && (

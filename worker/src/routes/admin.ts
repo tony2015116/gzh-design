@@ -1,8 +1,81 @@
 import type { Env } from '../types';
-import { requireAdminUser } from '../lib/auth';
+import { hashPassword, normalizeEmail, requireAdminUser, validatePasswordStrength } from '../lib/auth';
 import { jsonResponse } from '../lib/http';
 import { getFormatLogLevel, getFormatPreviewChars } from '../lib/logging';
 import { getAiFormatAuthMode } from '../lib/permissions';
+
+export async function handleAdminUpdateUserRole(
+  request: Request,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const admin = await requireAdminUser(request, env, cors);
+  if (admin instanceof Response) return admin;
+
+  const body: any = await request.json().catch(() => ({}));
+  const email = normalizeEmail(String(body?.email || ''));
+  const role = body?.role;
+
+  if (!email) {
+    return jsonResponse({ error: '缺少邮箱' }, 400, cors);
+  }
+  if (role !== 'free' && role !== 'vip' && role !== 'admin') {
+    return jsonResponse({ error: '角色仅支持 free / vip / admin' }, 400, cors);
+  }
+
+  const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?')
+    .bind(email)
+    .first<{ id: string }>();
+  if (!user) {
+    return jsonResponse({ error: '用户不存在' }, 404, cors);
+  }
+
+  await env.DB.prepare('UPDATE users SET role = ? WHERE id = ?')
+    .bind(role, user.id)
+    .run();
+
+  return jsonResponse({ success: true, user: { id: user.id, email, role } }, 200, cors);
+}
+
+export async function handleAdminResetPassword(
+  request: Request,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const admin = await requireAdminUser(request, env, cors);
+  if (admin instanceof Response) return admin;
+
+  const body: any = await request.json().catch(() => ({}));
+  const email = normalizeEmail(String(body?.email || ''));
+  const newPassword = String(body?.newPassword || '');
+
+  if (!email) {
+    return jsonResponse({ error: '缺少邮箱' }, 400, cors);
+  }
+
+  const passwordError = validatePasswordStrength(newPassword);
+  if (passwordError) {
+    return jsonResponse({ error: passwordError }, 400, cors);
+  }
+
+  const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?')
+    .bind(email)
+    .first<{ id: string }>();
+  if (!user) {
+    return jsonResponse({ error: '用户不存在' }, 404, cors);
+  }
+
+  const hash = await hashPassword(newPassword);
+  await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+    .bind(hash, user.id)
+    .run();
+
+  await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?')
+    .bind(user.id)
+    .run();
+
+  return jsonResponse({ success: true }, 200, cors);
+}
 
 export async function handleAdminDiagnostics(
   request: Request,
@@ -15,6 +88,7 @@ export async function handleAdminDiagnostics(
   const requiredTables = [
     'users',
     'sessions',
+    'login_attempts',
     'presets',
     'illustration_jobs',
     'illustration_items',

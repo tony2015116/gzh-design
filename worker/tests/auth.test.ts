@@ -1,30 +1,53 @@
 import { describe, expect, it } from 'vitest';
-import { generateSessionToken, hashPassword } from '../src/lib/auth';
+import { generateSessionToken, hashPassword, verifyPassword } from '../src/lib/auth';
 import { getBearerToken } from '../src/lib/http';
 
-describe('hashPassword', () => {
-  it('对同一密码产生稳定哈希（round-trip：登录时重新哈希可与注册时存储值匹配）', async () => {
+const LEGACY_KNOWN_HASH = '4a1a86f7f13d2f4448dc412ec574ea29480577a69f0acbe0d509d6cd77f1318c'; // password123 + 旧盐
+
+describe('hashPassword（PBKDF2 新格式）', () => {
+  it('输出 pbkdf2:<iterations>:<saltHex>:<hashHex> 格式', async () => {
+    const hash = await hashPassword('password123');
+    const [scheme, iterations, saltHex, hashHex] = hash.split(':');
+    expect(scheme).toBe('pbkdf2');
+    expect(iterations).toBe('100000');
+    expect(saltHex).toMatch(/^[0-9a-f]{32}$/);
+    expect(hashHex).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('同一密码两次哈希结果不同（随机盐）', async () => {
+    const first = await hashPassword('password123');
+    const second = await hashPassword('password123');
+    expect(first).not.toBe(second);
+  });
+
+  it('round-trip：hashPassword 后 verifyPassword 通过且不需要重哈希', async () => {
     const stored = await hashPassword('password123');
-    const loginAttempt = await hashPassword('password123');
-    expect(loginAttempt).toBe(stored);
+    const result = await verifyPassword('password123', stored);
+    expect(result).toEqual({ ok: true, needsRehash: false });
   });
 
-  it('匹配已知向量（sha256(password + 固定盐)）', async () => {
-    expect(await hashPassword('password123')).toBe(
-      '4a1a86f7f13d2f4448dc412ec574ea29480577a69f0acbe0d509d6cd77f1318c',
-    );
-  });
-
-  it('错误密码得到不同哈希（校验拒绝）', async () => {
+  it('错误密码被拒绝', async () => {
     const stored = await hashPassword('password123');
-    expect(await hashPassword('password124')).not.toBe(stored);
-    expect(await hashPassword('')).not.toBe(stored);
-    expect(await hashPassword('PASSWORD123')).not.toBe(stored);
+    expect(await verifyPassword('password124', stored)).toEqual({ ok: false, needsRehash: false });
+    expect(await verifyPassword('', stored)).toEqual({ ok: false, needsRehash: false });
+  });
+});
+
+describe('verifyPassword（旧 SHA-256 格式兼容）', () => {
+  it('旧格式已知向量验证通过且标记 needsRehash', async () => {
+    const result = await verifyPassword('password123', LEGACY_KNOWN_HASH);
+    expect(result).toEqual({ ok: true, needsRehash: true });
   });
 
-  it('输出为 64 位小写十六进制字符串', async () => {
-    const hash = await hashPassword('任意密码😀');
-    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+  it('旧格式错误密码被拒绝且不触发重哈希', async () => {
+    const result = await verifyPassword('wrong-password', LEGACY_KNOWN_HASH);
+    expect(result).toEqual({ ok: false, needsRehash: false });
+  });
+
+  it('无法识别的哈希格式直接拒绝', async () => {
+    expect(await verifyPassword('password123', 'not-a-hash')).toEqual({ ok: false, needsRehash: false });
+    expect(await verifyPassword('password123', 'pbkdf2:abc::')).toEqual({ ok: false, needsRehash: false });
+    expect(await verifyPassword('password123', '')).toEqual({ ok: false, needsRehash: false });
   });
 });
 

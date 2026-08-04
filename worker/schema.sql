@@ -20,6 +20,13 @@ CREATE TABLE IF NOT EXISTS sessions (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Login rate limiting: failed attempts per email within a 10-minute window
+CREATE TABLE IF NOT EXISTS login_attempts (
+  email TEXT PRIMARY KEY,
+  failures INTEGER NOT NULL DEFAULT 0,
+  window_start TEXT
+);
+
 -- Presets Table for Saving User Combinations
 CREATE TABLE IF NOT EXISTS presets (
   id TEXT PRIMARY KEY,

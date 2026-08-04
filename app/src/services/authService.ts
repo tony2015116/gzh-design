@@ -45,10 +45,35 @@ function saveAuthState(token: string, user: User): void {
   localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
-/** Clear auth state */
-export function logout(): void {
+/** Clear auth state（先尝试通知服务端删除会话，失败也继续本地登出） */
+export async function logout(): Promise<void> {
+  const workerUrl = getWorkerUrl();
+  if (workerUrl) {
+    try {
+      await fetch(`${workerUrl}/api/auth/logout`, {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+    } catch {
+      // 容错：网络或 Worker 异常不阻塞本地登出
+    }
+  }
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+}
+
+/** Change the current user's password */
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  const workerUrl = getWorkerUrl();
+  if (!workerUrl) throw new Error('未配置 Worker URL，请在系统设置中配置 R2 Worker 地址');
+
+  const res = await fetch(`${workerUrl}/api/auth/change-password`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ oldPassword, newPassword }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || '修改密码失败');
 }
 
 /** Get currently logged in user */

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useRef } from 'react';
 import { loadUploadMode, loadR2Config, loadCdnConfig, compressImageToBlob, uploadImageToR2, uploadImageToCdn } from '../../services/imageUpload';
 
 interface EditorProps {
@@ -9,6 +9,19 @@ interface EditorProps {
 }
 
 export const Editor: React.FC<EditorProps> = ({ value, onChange, editorRef, onScroll }) => {
+  const gutterRef = useRef<HTMLDivElement>(null);
+
+  const lineNumbers = useMemo(() => {
+    const count = value.split('\n').length;
+    return Array.from({ length: count }, (_, index) => index + 1);
+  }, [value]);
+
+  const handleScroll: React.UIEventHandler<HTMLTextAreaElement> = (event) => {
+    if (gutterRef.current) {
+      gutterRef.current.scrollTop = event.currentTarget.scrollTop;
+    }
+    onScroll?.(event);
+  };
 
   /** Insert text at cursor position and return new cursor offset */
   const insertAtCursor = (textarea: HTMLTextAreaElement, text: string, start: number, end: number) => {
@@ -142,12 +155,23 @@ export const Editor: React.FC<EditorProps> = ({ value, onChange, editorRef, onSc
   };
 
   return (
-    <div className="h-[calc(100%-2.5rem)] w-full">
+    <div className="flex h-[calc(100%-2.5rem)] w-full">
+      <div
+        ref={gutterRef}
+        aria-hidden
+        className="w-12 flex-none select-none overflow-hidden border-r border-gray-100 bg-gray-50 py-6 pl-2 pr-3 text-right font-mono text-sm leading-6 text-gray-400"
+      >
+        {lineNumbers.map((line) => (
+          <div key={line} className="h-6">
+            {line}
+          </div>
+        ))}
+      </div>
       <textarea
         ref={editorRef}
-        onScroll={onScroll}
+        onScroll={handleScroll}
         onPaste={handlePaste}
-        className="w-full h-full p-6 text-gray-800 font-mono text-sm resize-none focus:outline-none focus:ring-0 !border-0"
+        className="h-full w-full resize-none p-6 font-mono text-sm leading-6 text-gray-800 !border-0 focus:outline-none focus:ring-0"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="在此输入 Markdown..."

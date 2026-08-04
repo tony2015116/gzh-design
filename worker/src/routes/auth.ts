@@ -1,16 +1,33 @@
 import type { Env } from '../types';
-import { authenticate, generateSessionToken, hashPassword } from '../lib/auth';
-import { jsonResponse } from '../lib/http';
+import {
+  authenticate,
+  clearLoginAttempts,
+  generateSessionToken,
+  hashPassword,
+  isLoginRateLimited,
+  normalizeEmail,
+  recordLoginFailure,
+  requireAuthenticatedUser,
+  validatePasswordStrength,
+  verifyPassword,
+} from '../lib/auth';
+import { getBearerToken, jsonResponse } from '../lib/http';
 
 export async function handleRegister(request: Request, env: Env, cors: Record<string, string>): Promise<Response> {
   const body: any = await request.json().catch(() => ({}));
-  const { email, password } = body;
+  const email = normalizeEmail(String(body?.email || ''));
+  const { password } = body;
 
-  if (!email || !password || password.length < 6) {
-    return jsonResponse({ error: '邮箱无效或密码过短' }, 400, cors);
+  if (!email || !password) {
+    return jsonResponse({ error: '邮箱或密码无效' }, 400, cors);
   }
 
-  const hash = await hashPassword(password);
+  const passwordError = validatePasswordStrength(String(password));
+  if (passwordError) {
+    return jsonResponse({ error: passwordError }, 400, cors);
+  }
+
+  const hash = await hashPassword(String(password));
   const userId = crypto.randomUUID();
 
   try {
@@ -39,23 +56,100 @@ export async function handleRegister(request: Request, env: Env, cors: Record<st
 
 export async function handleLogin(request: Request, env: Env, cors: Record<string, string>): Promise<Response> {
   const body: any = await request.json().catch(() => ({}));
-  const { email, password } = body;
+  const email = normalizeEmail(String(body?.email || ''));
+  const password = String(body?.password || '');
 
-  const hash = await hashPassword(password || '');
-  const user = await env.DB.prepare('SELECT id, email, role FROM users WHERE email = ? AND password_hash = ?')
-    .bind(email, hash)
-    .first<{ id: string; email: string; role: string }>();
+  if (await isLoginRateLimited(env, email)) {
+    return jsonResponse({ error: '登录失败次数过多，请 10 分钟后再试' }, 429, cors);
+  }
 
-  if (!user) {
+  const user = await env.DB.prepare('SELECT id, email, role, password_hash FROM users WHERE email = ?')
+    .bind(email)
+    .first<{ id: string; email: string; role: string; password_hash: string }>();
+
+  const verification = user
+    ? await verifyPassword(password, user.password_hash)
+    : { ok: false, needsRehash: false };
+
+  if (!user || !verification.ok) {
+    await recordLoginFailure(env, email);
     return jsonResponse({ error: '邮箱或密码错误' }, 401, cors);
   }
+
+  if (verification.needsRehash) {
+    const upgradedHash = await hashPassword(password);
+    await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+      .bind(upgradedHash, user.id)
+      .run();
+  }
+
+  await clearLoginAttempts(env, email);
+  await env.DB.prepare(`DELETE FROM sessions WHERE expires_at <= datetime('now')`).run();
 
   const token = generateSessionToken();
   await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime("now", "+7 days"))')
     .bind(token, user.id)
     .run();
 
-  return jsonResponse({ success: true, token, user }, 200, cors);
+  return jsonResponse({
+    success: true,
+    token,
+    user: { id: user.id, email: user.email, role: user.role },
+  }, 200, cors);
+}
+
+export async function handleLogout(request: Request, env: Env, cors: Record<string, string>): Promise<Response> {
+  const token = getBearerToken(request);
+  if (token) {
+    await env.DB.prepare('DELETE FROM sessions WHERE token = ?')
+      .bind(token)
+      .run()
+      .catch(() => undefined);
+  }
+
+  return jsonResponse({ success: true }, 200, cors);
+}
+
+export async function handleChangePassword(request: Request, env: Env, cors: Record<string, string>): Promise<Response> {
+  const user = await requireAuthenticatedUser(request, env, cors);
+  if (user instanceof Response) return user;
+
+  const body: any = await request.json().catch(() => ({}));
+  const oldPassword = String(body?.oldPassword || '');
+  const newPassword = String(body?.newPassword || '');
+
+  if (!oldPassword || !newPassword) {
+    return jsonResponse({ error: '缺少旧密码或新密码' }, 400, cors);
+  }
+
+  const row = await env.DB.prepare('SELECT password_hash FROM users WHERE id = ?')
+    .bind(user.id)
+    .first<{ password_hash: string }>();
+  if (!row) {
+    return jsonResponse({ error: '用户不存在' }, 404, cors);
+  }
+
+  const verification = await verifyPassword(oldPassword, row.password_hash);
+  if (!verification.ok) {
+    return jsonResponse({ error: '旧密码不正确' }, 401, cors);
+  }
+
+  const passwordError = validatePasswordStrength(newPassword);
+  if (passwordError) {
+    return jsonResponse({ error: passwordError }, 400, cors);
+  }
+
+  const hash = await hashPassword(newPassword);
+  await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+    .bind(hash, user.id)
+    .run();
+
+  const currentToken = getBearerToken(request);
+  await env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?')
+    .bind(user.id, currentToken)
+    .run();
+
+  return jsonResponse({ success: true }, 200, cors);
 }
 
 export async function handleUserInfo(request: Request, env: Env, cors: Record<string, string>): Promise<Response> {

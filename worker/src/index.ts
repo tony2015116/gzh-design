@@ -4,9 +4,9 @@ import { handleServeFile } from './routes/files';
 import { handleUpload } from './routes/upload';
 import { handleFormat } from './routes/format';
 import { handleIllustrationJobCreate, handleIllustrationJobGet, handleIllustrationPlan } from './routes/illustration';
-import { handleLogin, handleRegister, handleUserInfo } from './routes/auth';
+import { handleChangePassword, handleLogin, handleLogout, handleRegister, handleUserInfo } from './routes/auth';
 import { handleDeletePreset, handleGetPresets, handleSavePreset } from './routes/presets';
-import { handleAdminDiagnostics } from './routes/admin';
+import { handleAdminDiagnostics, handleAdminResetPassword, handleAdminUpdateUserRole } from './routes/admin';
 
 export { IllustrationWorkflow } from './workflow';
 
@@ -61,12 +61,28 @@ export default {
       return handleLogin(request, env, cors);
     }
 
+    if (url.pathname === '/api/auth/logout' && request.method === 'POST') {
+      return handleLogout(request, env, cors);
+    }
+
+    if (url.pathname === '/api/auth/change-password' && request.method === 'POST') {
+      return handleChangePassword(request, env, cors);
+    }
+
     if (url.pathname === '/api/user/info' && request.method === 'GET') {
       return handleUserInfo(request, env, cors);
     }
 
     if (url.pathname === '/api/admin/diagnostics' && request.method === 'GET') {
       return handleAdminDiagnostics(request, env, cors);
+    }
+
+    if (url.pathname === '/api/admin/users/role' && request.method === 'POST') {
+      return handleAdminUpdateUserRole(request, env, cors);
+    }
+
+    if (url.pathname === '/api/admin/users/reset-password' && request.method === 'POST') {
+      return handleAdminResetPassword(request, env, cors);
     }
 
     if (url.pathname === '/api/user/presets' && request.method === 'GET') {
