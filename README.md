@@ -27,8 +27,12 @@
 
 ## 当前功能
 
-- Markdown 编辑 + 实时公众号预览
+- Markdown 编辑（带行号）+ 实时公众号预览，编辑器滚动时预览按比例跟随
+- 顶栏按“外观设置 / 动作”分组：主题、版式、图片、预设在左侧；右侧为「复制到公众号」主按钮，AI 排版与智能配图收进「AI 工具」菜单，X 复制与导出图片收进「更多导出」菜单
+- 右侧预览区按 Tab 切换「公众号 / X Thread / X Article」，X 输出直接在预览栏内查看与逐条复制
 - 单输入、多平台导出
+- 图片导出中心：完整长图、按平台比例切片多图、小红书爆款封面（多套模板 + 自定义标题/副标题/主题色 + AI 根据正文生成封面方案）
+- 小红书图文生成：AI 把正文拆成封面 + 内容卡的轮播组图（7 种版式），三套视觉系统（杂志风 / 手账风 / 简约风）各 6 套主题包，支持逐张微调文案、溢出提醒与打包下载
 - 主题 / 版式 / 图片风格切换
 - AI 排版
 - 图片上传
@@ -47,6 +51,8 @@
 
 - `AI 排版`
   - 必须登录
+- `AI 封面方案` / `AI 图文生成`
+  - 与 AI 排版共用同一套鉴权（`AI_FORMAT_AUTH_MODE`），online 默认必须登录
 - `智能配图建议`
   - 必须 `vip / admin`
 - `智能配图生成`
@@ -113,7 +119,7 @@ npm run dev:oss
 说明：
 
 - 不依赖 Cloudflare Worker 即可调 UI 和大部分前端行为
-- 页面右上会显示调试身份切换器
+- 页面调试身份切换器收在设置面板里（仅 mock 模式显示）
 - OSS 下 AI 排版需要在前端设置里配置模型 API Key
 - OSS 下智能配图可以完整走“建议 -> 确认 -> 生成 -> 应用”流程
 - OSS 和 online 现在都支持从同一份 Markdown 直接导出 X Thread / X Article 文案，不会覆盖公众号正文
@@ -265,7 +271,25 @@ npm run deploy -- --dry-run
 - `vip`
 - `admin`
 
-联调阶段可以直接在 D1 中手工升级测试账号为 VIP：
+角色变更优先使用 admin API（用 admin 账号的 Bearer token 调用）：
+
+```bash
+curl -X POST "https://your-worker.workers.dev/api/admin/users/role" \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "your-test-account@example.com", "role": "vip"}'
+```
+
+忘记密码时可由 admin 重置（重置后该用户所有会话失效，需重新登录）：
+
+```bash
+curl -X POST "https://your-worker.workers.dev/api/admin/users/reset-password" \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "your-test-account@example.com", "newPassword": "newpass123"}'
+```
+
+联调阶段也可以直接在 D1 中手工升级测试账号为 VIP（备选方式）：
 
 ```sql
 UPDATE users
@@ -276,7 +300,11 @@ WHERE email = 'your-test-account@example.com';
 说明：
 
 - 目前还没有独立的 VIP 运营后台
-- 线上 VIP 管理暂时依赖数据库角色字段
+- 线上 VIP 管理优先走 admin API，数据库直改为备选
+- 登出：`POST /api/auth/logout` 会在服务端删除当前会话
+- 改密：`POST /api/auth/change-password`（需登录），修改后其他设备强制下线
+- 登录限流：同一邮箱 10 分钟内失败 5 次后返回 429，登录成功自动清零
+- 密码使用 PBKDF2 存储，旧 SHA-256 账号在下次登录时自动迁移
 
 ## 日志与排障
 
@@ -367,5 +395,6 @@ npm run dev:oss
 
 ## 子文档
 
+- 部署上线见 [DEPLOYMENT.md](./DEPLOYMENT.md)
 - 前端说明见 [app/README.md](./app/README.md)
 - Worker 说明见 [worker/README.md](./worker/README.md)

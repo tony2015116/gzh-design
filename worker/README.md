@@ -11,7 +11,7 @@ Cloudflare Worker backend for auth, presets, image upload, AI typesetting, and s
 
 ## Required secrets
 
-- `OPENAI_API_KEY`: used by `/api/format` and optional illustration planning refinement
+- `OPENAI_API_KEY`: used by `/api/format`, `/api/cover-copy`, `/api/xhs-cards` and optional illustration planning refinement
 
 ## Optional secrets
 

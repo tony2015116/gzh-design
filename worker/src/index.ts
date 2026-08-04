@@ -3,6 +3,8 @@ import { corsHeaders, jsonResponse } from './lib/http';
 import { handleServeFile } from './routes/files';
 import { handleUpload } from './routes/upload';
 import { handleFormat } from './routes/format';
+import { handleCoverCopy } from './routes/coverCopy';
+import { handleXhsCards } from './routes/xhsCards';
 import { handleIllustrationJobCreate, handleIllustrationJobGet, handleIllustrationPlan } from './routes/illustration';
 import { handleChangePassword, handleLogin, handleLogout, handleRegister, handleUserInfo } from './routes/auth';
 import { handleDeletePreset, handleGetPresets, handleSavePreset } from './routes/presets';
@@ -34,6 +36,14 @@ export default {
 
     if (url.pathname === '/api/format' && request.method === 'POST') {
       return handleFormat(request, env, cors);
+    }
+
+    if (url.pathname === '/api/cover-copy' && request.method === 'POST') {
+      return handleCoverCopy(request, env, cors);
+    }
+
+    if (url.pathname === '/api/xhs-cards' && request.method === 'POST') {
+      return handleXhsCards(request, env, cors);
     }
 
     if (url.pathname === '/api/illustration/plan' && request.method === 'POST') {

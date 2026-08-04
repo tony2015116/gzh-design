@@ -1225,6 +1225,7 @@ function TypesetterView() {
       {showImageExportPanel && (
         <ImageExportPanel
           elementId="wechat-article-preview"
+          markdown={markdown}
           onClose={() => setShowImageExportPanel(false)}
         />
       )}

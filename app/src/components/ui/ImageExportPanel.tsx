@@ -1,9 +1,20 @@
-import { Download, Image as ImageIcon, Layers, Loader2, Sparkles, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { generateLongImage, generateSlicedImages } from '../../services/imageExportService';
+import { Download, Image as ImageIcon, Images, Layers, LayoutTemplate, Loader2, Sparkles, Wand2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { generateCoverCopy } from '../../ai/coverCopy';
+import type { CoverCopyProposal } from '../../ai/coverCopy';
+import { generateXhsCards } from '../../ai/xhsCards';
+import type { XhsDeck } from '../../ai/xhsCards';
+import { generateCoverImage, generateLongImage, generateSlicedImages } from '../../services/imageExportService';
+import { COVER_COLORS, COVER_HEIGHT, COVER_TEMPLATES, COVER_WIDTH, CoverTemplate } from './CoverTemplate';
+import type { CoverTemplateId } from './CoverTemplate';
+import { getXhsTheme, XHS_CARD_HEIGHT, XHS_CARD_WIDTH, XHS_THEME_PACKS, XhsCard } from './XhsCard';
+import type { XhsCardSpec } from './XhsCard';
+import { getStickerTheme, XHS_STICKER_THEMES, XhsStickerCard } from './XhsStickerCard';
+import { getMinimalTheme, XHS_MINIMAL_THEMES, XhsMinimalCard } from './XhsMinimalCard';
 
 interface ImageExportPanelProps {
   elementId: string;
+  markdown?: string;
   onClose: () => void;
 }
 
@@ -14,16 +25,147 @@ const RATIO_OPTIONS = [
   { label: '16:9 (超宽图)', value: 9 / 16 },
 ];
 
-export function ImageExportPanel({ elementId, onClose }: ImageExportPanelProps) {
-  const [activeMode, setActiveMode] = useState<'long' | 'slice'>('long');
+/** Scale used to fit the 1080x1440 cover node into the preview area. */
+const COVER_PREVIEW_SCALE = 0.34;
+
+/** Scale used for the AI proposal thumbnail cards. */
+const COVER_THUMB_SCALE = 0.115;
+
+/** Scale used for each card thumbnail in the XHS deck grid. */
+const XHS_CARD_THUMB_SCALE = 0.2;
+
+// --- 图文卡片编辑器：把不同版式的文本字段统一成「主文案 / 次文案 / 要点行」 ---
+
+const cardMainText = (card: XhsCardSpec): string =>
+  card.layout === 'cover' ? card.title : card.layout === 'quote' ? card.quote : card.heading;
+
+const withMainText = (card: XhsCardSpec, value: string): XhsCardSpec => {
+  if (card.layout === 'cover') return { ...card, title: value };
+  if (card.layout === 'quote') return { ...card, quote: value };
+  return { ...card, heading: value };
+};
+
+const cardSecondaryText = (card: XhsCardSpec): string | null => {
+  if (card.layout === 'cover') return card.subtitle;
+  if (card.layout === 'quote') return card.source;
+  if (card.layout === 'summary') return card.closing;
+  return null;
+};
+
+const withSecondaryText = (card: XhsCardSpec, value: string): XhsCardSpec => {
+  if (card.layout === 'cover') return { ...card, subtitle: value };
+  if (card.layout === 'quote') return { ...card, source: value };
+  if (card.layout === 'summary') return { ...card, closing: value };
+  return card;
+};
+
+/** 要点行序列化：每行一条，复合结构用 ｜ 分隔 */
+const cardLines = (card: XhsCardSpec): string | null => {
+  switch (card.layout) {
+    case 'cover':
+      return card.points.join('\n');
+    case 'checklist':
+    case 'summary':
+      return card.items.map((it) => (it.detail ? `${it.label}｜${it.detail}` : it.label)).join('\n');
+    case 'steps':
+      return card.steps.map((s) => (s.desc ? `${s.title}｜${s.desc}` : s.title)).join('\n');
+    case 'data':
+      return card.rows.map((r) => `${r.label}|${r.value}|${r.pct}`).join('\n');
+    default:
+      return null;
+  }
+};
+
+const withLines = (card: XhsCardSpec, text: string): XhsCardSpec => {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const pair = (l: string) => {
+    const [a = '', b = ''] = l.split('｜').map((s) => s.trim());
+    return { label: a, detail: b };
+  };
+  switch (card.layout) {
+    case 'cover':
+      return { ...card, points: lines };
+    case 'checklist':
+    case 'summary':
+      return { ...card, items: lines.map(pair).filter((it) => it.label) };
+    case 'steps':
+      return { ...card, steps: lines.map(pair).filter((s) => s.label).map((s) => ({ title: s.label, desc: s.detail })) };
+    case 'data':
+      return {
+        ...card,
+        rows: lines
+          .map((l) => {
+            const [label = '', value = '', pct = '0'] = l.split('|').map((s) => s.trim());
+            return { label, value, pct: Number(pct) || 0 };
+          })
+          .filter((r) => r.label && r.value),
+      };
+    default:
+      return card;
+  }
+};
+
+const extractCoverDefaults = (markdown: string): { title: string; subtitle: string } => {
+  const line = markdown
+    .split('\n')
+    .map((l) => l.trim())
+    .find((l) => l.startsWith('# '));
+  if (!line) return { title: '', subtitle: '' };
+  const raw = line.replace(/^#\s+/, '');
+  const parts = raw.split('|').map((s) => s.trim());
+  if (parts.length >= 2) {
+    return {
+      title: parts[1] || parts[0],
+      subtitle: (parts[2] || '').replace(/^\/+\s*/, ''),
+    };
+  }
+  return { title: raw, subtitle: '' };
+};
+
+export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPanelProps) {
+  const [activeMode, setActiveMode] = useState<'long' | 'slice' | 'cover' | 'cards'>('long');
   const [sliceRatio, setSliceRatio] = useState<number>(4 / 3);
   const [images, setImages] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [coverTitle, setCoverTitle] = useState(() => extractCoverDefaults(markdown ?? '').title);
+  const [coverSubtitle, setCoverSubtitle] = useState(() => extractCoverDefaults(markdown ?? '').subtitle);
+  const [coverTemplate, setCoverTemplate] = useState<CoverTemplateId>('poster');
+  const [coverColor, setCoverColor] = useState(COVER_COLORS[0]);
+  const [isDownloadingCover, setIsDownloadingCover] = useState(false);
+  const [coverProposals, setCoverProposals] = useState<CoverCopyProposal[]>([]);
+  const [isGeneratingCopy, setIsGeneratingCopy] = useState(false);
+  const [appliedProposalIndex, setAppliedProposalIndex] = useState<number | null>(null);
+  const [xhsDeck, setXhsDeck] = useState<XhsDeck | null>(null);
+  const [cardSystem, setCardSystem] = useState<'editorial' | 'sticker' | 'minimal'>('editorial');
+  const [stickerThemeId, setStickerThemeId] = useState(XHS_STICKER_THEMES[0].id);
+  const [minimalThemeId, setMinimalThemeId] = useState(XHS_MINIMAL_THEMES[0].id);
+  const [isGeneratingDeck, setIsGeneratingDeck] = useState(false);
+  const [selectedCardIndex, setSelectedCardIndex] = useState(0);
+  const [isDownloadingCards, setIsDownloadingCards] = useState(false);
+  const [overflowCards, setOverflowCards] = useState<Set<number>>(new Set());
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // 截图专用：屏幕外渲染的原始尺寸节点。直接截缩略图会被 scale 变换污染。
+  const cardCaptureRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const coverCaptureRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (activeMode === 'cover' || activeMode === 'cards') return;
     generate();
   }, [activeMode, sliceRatio]);
+
+  // 渲染后测量每张卡片是否溢出（文字超出画布），给出警告而不是默默截断
+  useEffect(() => {
+    if (!xhsDeck) return;
+    const timer = setTimeout(() => {
+      const overflow = new Set<number>();
+      cardRefs.current.forEach((el, i) => {
+        if (el && el.scrollHeight > el.clientHeight + 4) overflow.add(i);
+      });
+      setOverflowCards(overflow);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [xhsDeck, cardSystem, stickerThemeId, minimalThemeId]);
 
   const generate = async () => {
     setIsGenerating(true);
@@ -62,6 +204,94 @@ export function ImageExportPanel({ elementId, onClose }: ImageExportPanelProps) 
         downloadImage(img, `export_${activeMode}_${Date.now()}_${index + 1}.png`);
       }, index * 300);
     });
+  };
+
+  const handleDownloadCover = async () => {
+    if (!coverCaptureRef.current) return;
+    setIsDownloadingCover(true);
+    setError(null);
+    try {
+      const img = await generateCoverImage(coverCaptureRef.current);
+      downloadImage(img, `xiaohongshu_cover_${Date.now()}.png`);
+    } catch (e: any) {
+      setError(e.message || '生成封面失败');
+    } finally {
+      setIsDownloadingCover(false);
+    }
+  };
+
+  const handleGenerateCopy = async () => {
+    setIsGeneratingCopy(true);
+    setError(null);
+    try {
+      const proposals = await generateCoverCopy(markdown ?? '');
+      setCoverProposals(proposals);
+      setAppliedProposalIndex(null);
+    } catch (e: any) {
+      setError(e.message || 'AI 封面方案生成失败');
+    } finally {
+      setIsGeneratingCopy(false);
+    }
+  };
+
+  const applyProposal = (proposal: CoverCopyProposal, index: number) => {
+    setCoverTitle(proposal.title);
+    setCoverSubtitle(proposal.subtitle);
+    setCoverTemplate(proposal.template);
+    setCoverColor(proposal.color);
+    setAppliedProposalIndex(index);
+  };
+
+  const handleGenerateDeck = async () => {
+    setIsGeneratingDeck(true);
+    setError(null);
+    try {
+      const deck = await generateXhsCards(markdown ?? '');
+      setXhsDeck(deck);
+      setSelectedCardIndex(0);
+    } catch (e: any) {
+      setError(e.message || 'AI 图文生成失败');
+    } finally {
+      setIsGeneratingDeck(false);
+    }
+  };
+
+  const updateCard = (index: number, next: XhsCardSpec) => {
+    setXhsDeck((d) => (d ? { ...d, cards: d.cards.map((c, i) => (i === index ? next : c)) } : d));
+  };
+
+  /** 按当前视觉系统渲染一张卡片（缩略图与截图宿主共用） */
+  const renderDeckCard = (card: XhsCardSpec, index: number) => {
+    if (!xhsDeck) return null;
+    const page = index + 1;
+    const total = xhsDeck.cards.length;
+    if (cardSystem === 'sticker') {
+      return <XhsStickerCard card={card} theme={getStickerTheme(stickerThemeId)} page={page} total={total} />;
+    }
+    if (cardSystem === 'minimal') {
+      return <XhsMinimalCard card={card} theme={getMinimalTheme(minimalThemeId)} page={page} total={total} />;
+    }
+    return <XhsCard card={card} theme={getXhsTheme(xhsDeck.theme)} page={page} total={total} />;
+  };
+
+  const handleDownloadCards = async () => {
+    if (!xhsDeck) return;
+    setIsDownloadingCards(true);
+    setError(null);
+    try {
+      for (let i = 0; i < xhsDeck.cards.length; i++) {
+        const node = cardCaptureRefs.current[i];
+        if (!node) continue;
+        const img = await generateCoverImage(node);
+        downloadImage(img, `xhs_card_${Date.now()}_${String(i + 1).padStart(2, '0')}.png`);
+        // 避免浏览器拦截连续下载
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    } catch (e: any) {
+      setError(e.message || '图文下载失败');
+    } finally {
+      setIsDownloadingCards(false);
+    }
   };
 
   return (
@@ -114,6 +344,28 @@ export function ImageExportPanel({ elementId, onClose }: ImageExportPanelProps) 
               <Layers className="h-4 w-4" />
               切片多图
             </button>
+            <button
+              onClick={() => setActiveMode('cover')}
+              className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                activeMode === 'cover'
+                  ? 'bg-amber-300 text-slate-950 shadow-[0_10px_30px_rgba(252,211,77,0.35)]'
+                  : 'border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+              }`}
+            >
+              <LayoutTemplate className="h-4 w-4" />
+              爆款封面
+            </button>
+            <button
+              onClick={() => setActiveMode('cards')}
+              className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                activeMode === 'cards'
+                  ? 'bg-emerald-300 text-slate-950 shadow-[0_10px_30px_rgba(110,231,183,0.35)]'
+                  : 'border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+              }`}
+            >
+              <Images className="h-4 w-4" />
+              小红书图文
+            </button>
           </div>
           
           {activeMode === 'slice' && (
@@ -141,7 +393,407 @@ export function ImageExportPanel({ elementId, onClose }: ImageExportPanelProps) 
             </div>
           )}
 
-          {isGenerating ? (
+          {activeMode === 'cards' ? (
+            !xhsDeck ? (
+              <div className="flex flex-1 items-center justify-center">
+                <div className="flex flex-col items-center gap-4 text-center">
+                  <Images className="h-10 w-10 text-emerald-300" />
+                  <p className="max-w-[420px] text-sm leading-6 text-slate-300">
+                    AI 会通读正文，把文章拆成封面 + 若干张内容卡（清单 / 步骤 / 对比 / 金句 / 总结），
+                    生成一整组 3:4 小红书轮播图文。
+                  </p>
+                  <button
+                    onClick={handleGenerateDeck}
+                    disabled={isGeneratingDeck}
+                    className="inline-flex items-center gap-2 rounded-full bg-emerald-300 px-6 py-3 text-sm font-semibold text-slate-950 transition-colors hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isGeneratingDeck ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-4 w-4" />
+                    )}
+                    {isGeneratingDeck ? 'AI 正在拆解文章...' : 'AI 生成图文'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-1 flex-col gap-8 lg:flex-row">
+                <div className="w-full shrink-0 space-y-6 lg:w-[300px]">
+                  <button
+                    onClick={handleGenerateDeck}
+                    disabled={isGeneratingDeck}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-emerald-300/40 bg-emerald-300/10 px-5 py-2.5 text-sm font-semibold text-emerald-200 transition-colors hover:bg-emerald-300/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isGeneratingDeck ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-4 w-4" />
+                    )}
+                    {isGeneratingDeck ? 'AI 正在拆解文章...' : '重新生成'}
+                  </button>
+
+                  <div>
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                      视觉系统
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { id: 'editorial', name: '杂志风' },
+                        { id: 'sticker', name: '手账风' },
+                        { id: 'minimal', name: '简约风' },
+                      ] as const).map((sys) => (
+                        <button
+                          key={sys.id}
+                          onClick={() => setCardSystem(sys.id)}
+                          className={`rounded-[14px] px-3 py-2.5 text-sm font-medium transition-all ${
+                            cardSystem === sys.id
+                              ? 'bg-emerald-300 text-slate-950 shadow-[0_8px_24px_rgba(110,231,183,0.3)]'
+                              : 'border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+                          }`}
+                        >
+                          {sys.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                      主题包
+                    </label>
+                    {(() => {
+                      const packs =
+                        cardSystem === 'sticker' ? XHS_STICKER_THEMES
+                        : cardSystem === 'minimal' ? XHS_MINIMAL_THEMES
+                        : XHS_THEME_PACKS;
+                      const activeId =
+                        cardSystem === 'sticker' ? stickerThemeId
+                        : cardSystem === 'minimal' ? minimalThemeId
+                        : xhsDeck.theme;
+                      const select = (id: string) => {
+                        if (cardSystem === 'sticker') setStickerThemeId(id);
+                        else if (cardSystem === 'minimal') setMinimalThemeId(id);
+                        else setXhsDeck((d) => (d ? { ...d, theme: id } : d));
+                      };
+                      return (
+                        <div className="grid grid-cols-3 gap-2">
+                          {packs.map((pack) => (
+                            <button
+                              key={pack.id}
+                              onClick={() => select(pack.id)}
+                              title={pack.name}
+                              className={`overflow-hidden rounded-[12px] border transition-all ${
+                                activeId === pack.id
+                                  ? 'border-emerald-300 ring-1 ring-emerald-300'
+                                  : 'border-white/10 hover:border-white/30'
+                              }`}
+                              style={{ background: pack.bg }}
+                            >
+                              <div className="flex h-8 items-end justify-between p-1.5">
+                                <span style={{ width: 12, height: 12, borderRadius: 4, background: pack.accent }} />
+                                <span style={{ width: 18, height: 3, borderRadius: 2, background: pack.fg, opacity: 0.7 }} />
+                              </div>
+                              <div className="px-1.5 pb-1.5 text-left text-[10px] font-medium" style={{ color: pack.fg }}>
+                                {pack.name}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {(() => {
+                    const card = xhsDeck.cards[selectedCardIndex];
+                    if (!card) return null;
+                    const secondary = cardSecondaryText(card);
+                    const lines = cardLines(card);
+                    return (
+                      <div className="space-y-3 rounded-[18px] border border-white/10 bg-white/5 p-4">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                          编辑第 {selectedCardIndex + 1} 张（{card.layout}）
+                        </div>
+                        <input
+                          value={card.kicker}
+                          onChange={(e) => updateCard(selectedCardIndex, { ...card, kicker: e.target.value })}
+                          placeholder="分类标签 kicker"
+                          className="w-full rounded-[12px] border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-slate-500 focus:border-emerald-300/50"
+                        />
+                        <textarea
+                          value={cardMainText(card)}
+                          onChange={(e) => updateCard(selectedCardIndex, withMainText(card, e.target.value))}
+                          rows={2}
+                          placeholder="主标题 / 主文案"
+                          className="w-full resize-none rounded-[12px] border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-500 focus:border-emerald-300/50"
+                        />
+                        {secondary !== null && (
+                          <input
+                            value={secondary}
+                            onChange={(e) => updateCard(selectedCardIndex, withSecondaryText(card, e.target.value))}
+                            placeholder="副标题 / 来源 / 收尾语"
+                            className="w-full rounded-[12px] border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-slate-500 focus:border-emerald-300/50"
+                          />
+                        )}
+                        {lines !== null && (
+                          <textarea
+                            value={lines}
+                            onChange={(e) => updateCard(selectedCardIndex, withLines(card, e.target.value))}
+                            rows={Math.min(7, lines.split('\n').length + 1)}
+                            placeholder="要点：每行一条，复合结构用 ｜ 分隔"
+                            className="w-full resize-none rounded-[12px] border border-white/10 bg-white/5 px-3 py-2 text-xs leading-5 text-white outline-none placeholder:text-slate-500 focus:border-emerald-300/50"
+                          />
+                        )}
+                        {overflowCards.has(selectedCardIndex) && (
+                          <p className="text-xs leading-5 text-amber-300">
+                            这张卡片内容超出画布，请删减文案，否则下载的图会被截断。
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  <button
+                    onClick={handleDownloadCards}
+                    disabled={isDownloadingCards}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isDownloadingCards ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    下载全部 {xhsDeck.cards.length} 张 PNG
+                  </button>
+                  {overflowCards.size > 0 && (
+                    <p className="text-xs leading-5 text-amber-300">
+                      第 {Array.from(overflowCards).map((i) => i + 1).join('、')} 张内容溢出，建议先精简再下载。
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-1 items-start justify-center overflow-auto rounded-[26px] border border-white/10 bg-[rgba(15,23,42,0.46)] p-6">
+                  <div className="grid grid-cols-2 gap-5 xl:grid-cols-3">
+                    {xhsDeck.cards.map((card, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedCardIndex(i)}
+                        className={`relative overflow-hidden rounded-[12px] transition-all ${
+                          selectedCardIndex === i
+                            ? 'ring-2 ring-emerald-300'
+                            : 'opacity-85 hover:opacity-100 hover:ring-1 hover:ring-white/40'
+                        }`}
+                        style={{
+                          width: XHS_CARD_WIDTH * XHS_CARD_THUMB_SCALE,
+                          height: XHS_CARD_HEIGHT * XHS_CARD_THUMB_SCALE,
+                        }}
+                      >
+                        <div
+                          className="pointer-events-none"
+                          style={{
+                            transform: `scale(${XHS_CARD_THUMB_SCALE})`,
+                            transformOrigin: 'top left',
+                          }}
+                        >
+                          <div ref={(el) => { cardRefs.current[i] = el; }}>
+                            {renderDeckCard(card, i)}
+                          </div>
+                        </div>
+                        {overflowCards.has(i) && (
+                          <span className="absolute right-2 top-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-slate-950">
+                            溢出
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 截图专用：屏幕外渲染的原始尺寸卡片（勿加 visibility/opacity，否则截出空白） */}
+                <div style={{ position: 'fixed', left: -99999, top: 0, pointerEvents: 'none' }} aria-hidden>
+                  {xhsDeck.cards.map((card, i) => (
+                    <div key={i} ref={(el) => { cardCaptureRefs.current[i] = el; }}>
+                      {renderDeckCard(card, i)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          ) : activeMode === 'cover' ? (
+            <div className="flex flex-1 flex-col gap-8 lg:flex-row">
+              <div className="w-full shrink-0 space-y-6 lg:w-[300px]">
+                <div>
+                  <button
+                    onClick={handleGenerateCopy}
+                    disabled={isGeneratingCopy}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-amber-300/40 bg-amber-300/10 px-5 py-2.5 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-300/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isGeneratingCopy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-4 w-4" />
+                    )}
+                    {isGeneratingCopy ? 'AI 正在分析文章...' : 'AI 生成封面方案'}
+                  </button>
+                  {coverProposals.length > 0 && (
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {coverProposals.map((proposal, index) => (
+                        <button
+                          key={index}
+                          onClick={() => applyProposal(proposal, index)}
+                          title={`${proposal.title}\n点击应用此方案`}
+                          className={`overflow-hidden rounded-[10px] transition-all ${
+                            appliedProposalIndex === index
+                              ? 'ring-2 ring-amber-300'
+                              : 'opacity-80 hover:opacity-100 hover:ring-1 hover:ring-white/40'
+                          }`}
+                          style={{
+                            width: COVER_WIDTH * COVER_THUMB_SCALE,
+                            height: COVER_HEIGHT * COVER_THUMB_SCALE,
+                          }}
+                        >
+                          <div
+                            className="pointer-events-none"
+                            style={{
+                              transform: `scale(${COVER_THUMB_SCALE})`,
+                              transformOrigin: 'top left',
+                            }}
+                          >
+                            <CoverTemplate
+                              title={proposal.title}
+                              subtitle={proposal.subtitle}
+                              template={proposal.template}
+                              accentColor={proposal.color}
+                            />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {coverProposals.length > 0 && (
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      点击缩略图应用方案，应用后仍可继续手动调整。
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">
+                    主标题
+                  </label>
+                  <textarea
+                    value={coverTitle}
+                    onChange={(e) => setCoverTitle(e.target.value)}
+                    rows={3}
+                    placeholder="输入封面主标题"
+                    className="w-full resize-none rounded-[18px] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 focus:border-amber-300/50"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">
+                    副标题（可选）
+                  </label>
+                  <textarea
+                    value={coverSubtitle}
+                    onChange={(e) => setCoverSubtitle(e.target.value)}
+                    rows={2}
+                    placeholder="输入副标题或钩子文案"
+                    className="w-full resize-none rounded-[18px] border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-slate-500 focus:border-amber-300/50"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">
+                    封面模板
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {COVER_TEMPLATES.map((tpl) => (
+                      <button
+                        key={tpl.id}
+                        onClick={() => setCoverTemplate(tpl.id)}
+                        className={`rounded-[14px] px-3 py-2.5 text-sm font-medium transition-all ${
+                          coverTemplate === tpl.id
+                            ? 'bg-amber-300 text-slate-950 shadow-[0_8px_24px_rgba(252,211,77,0.3)]'
+                            : 'border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+                        }`}
+                      >
+                        {tpl.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">
+                    主题色
+                  </label>
+                  <div className="flex flex-wrap gap-2.5">
+                    {COVER_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setCoverColor(color)}
+                        title={color}
+                        className={`h-9 w-9 rounded-full transition-all ${
+                          coverColor === color
+                            ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900'
+                            : 'opacity-70 hover:opacity-100'
+                        }`}
+                        style={{ background: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={handleDownloadCover}
+                  disabled={isDownloadingCover || !coverTitle.trim()}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isDownloadingCover ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  下载封面 PNG（3:4 高清）
+                </button>
+              </div>
+
+              <div className="flex flex-1 items-start justify-center overflow-auto rounded-[26px] border border-white/10 bg-[rgba(15,23,42,0.46)] p-6">
+                <div
+                  style={{
+                    width: COVER_WIDTH * COVER_PREVIEW_SCALE,
+                    height: COVER_HEIGHT * COVER_PREVIEW_SCALE,
+                    overflow: 'hidden',
+                    borderRadius: 12,
+                    boxShadow: '0 20px 60px rgba(2,8,23,0.5)',
+                  }}
+                >
+                  <div
+                    style={{
+                      transform: `scale(${COVER_PREVIEW_SCALE})`,
+                      transformOrigin: 'top left',
+                    }}
+                  >
+                    <div>
+                      <CoverTemplate
+                        title={coverTitle || '输入封面主标题'}
+                        subtitle={coverSubtitle}
+                        template={coverTemplate}
+                        accentColor={coverColor}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 截图专用：屏幕外的原始尺寸封面节点（勿加 visibility/opacity，否则截出空白） */}
+              <div style={{ position: 'fixed', left: -99999, top: 0, pointerEvents: 'none' }} aria-hidden>
+                <div ref={coverCaptureRef}>
+                  <CoverTemplate
+                    title={coverTitle || '输入封面主标题'}
+                    subtitle={coverSubtitle}
+                    template={coverTemplate}
+                    accentColor={coverColor}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : isGenerating ? (
             <div className="flex flex-1 items-center justify-center">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-pink-400" />

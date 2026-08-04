@@ -25,6 +25,26 @@ export const generateLongImage = async (
 };
 
 /**
+ * Generate a Xiaohongshu cover image from a rendered cover DOM node.
+ * Unlike the other helpers, the node is passed directly because it lives
+ * inside the export panel (visually scaled down for preview).
+ */
+export const generateCoverImage = async (
+  element: HTMLElement,
+  options: ExportImageOptions = { pixelRatio: 2 }
+): Promise<string> => {
+  try {
+    return await toPng(element, {
+      pixelRatio: options.pixelRatio,
+      backgroundColor: '#ffffff'
+    });
+  } catch (error) {
+    console.error('Failed to generate cover image:', error);
+    throw new Error('生成封面失败，请重试。');
+  }
+};
+
+/**
  * Generate sliced images
  * @param elementId The ID of the DOM element
  * @param heightMultiplier The multiplier for height relative to width (e.g., 4/3 for a 3:4 aspect ratio)
