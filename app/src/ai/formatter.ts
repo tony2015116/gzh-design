@@ -1,6 +1,7 @@
 import { getAuthMode } from '../services/accessControl';
 import { getAuthToken } from '../services/authService';
 import { loadR2Config } from '../services/imageUpload';
+import { resolveChatEndpoint } from './chatCompletion';
 import { createOssAiTraceId, getOssAiLogPreview, logOssAiEvent } from '../services/ossAiDebugLogger';
 
 export const defaultAIPrompt = `
@@ -87,10 +88,7 @@ export const getAITypesetMarkdown = async (
     throw new Error('需要先配置 API Key 才能使用 AI 自动排版。');
   }
 
-  let endpoint = finalBaseUrl;
-  if (!endpoint.endsWith('chat/completions')) {
-    endpoint = endpoint.endsWith('/') ? `${endpoint}chat/completions` : `${endpoint}/chat/completions`;
-  }
+  const endpoint = resolveChatEndpoint(finalBaseUrl);
 
   await logOssAiEvent(traceId, 'request.prepared', {
     endpoint,
@@ -102,20 +100,25 @@ export const getAITypesetMarkdown = async (
   });
 
   const startedAt = Date.now();
-  const response = await fetch(endpoint, {
+  const payload = {
+    model: finalModel,
+    messages: [
+      { role: 'system', content: defaultAIPrompt },
+      { role: 'user', content: markdown },
+    ],
+    temperature: 0.7,
+  };
+  // 开发环境走 vite dev server 的同源代理，绕开部分第三方中转缺失 CORS 头的问题
+  const useDevProxy = import.meta.env.DEV;
+  const response = await fetch(useDevProxy ? '/__ai-proxy' : endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      ...(useDevProxy ? {} : { Authorization: `Bearer ${apiKey}` }),
     },
-    body: JSON.stringify({
-      model: finalModel,
-      messages: [
-        { role: 'system', content: defaultAIPrompt },
-        { role: 'user', content: markdown },
-      ],
-      temperature: 0.7,
-    }),
+    body: JSON.stringify(
+      useDevProxy ? { endpoint, headers: { Authorization: `Bearer ${apiKey}` }, payload } : payload
+    ),
   });
   const durationMs = Date.now() - startedAt;
 
@@ -140,7 +143,18 @@ export const getAITypesetMarkdown = async (
     throw new Error(`${errMsg}\n详细信息: ${errTxt.slice(0, 200)}...`);
   }
 
-  const data = await response.json();
+  let data: any;
+  try {
+    data = await response.json();
+  } catch {
+    await logOssAiEvent(traceId, 'request.failed', {
+      endpoint,
+      model: finalModel,
+      durationMs,
+      reason: 'non_json_response',
+    });
+    throw new Error('接口返回的不是 JSON，多半是接口地址配错了（最常见：Base URL 漏了 /v1）。');
+  }
   const content = data.choices?.[0]?.message?.content || markdown;
 
   await logOssAiEvent(traceId, 'request.succeeded', {
