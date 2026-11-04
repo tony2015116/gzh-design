@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23111827'/%3E%3Cpath d='M8 10h16v3H8zm0 6h12v3H8zm0 6h16v3H8z' fill='%23FDE68A'/%3E%3C/svg%3E" />
+    <title>商务极简加粗颜色对照</title>
+    <style>
+      :root {
+        font-family: "Aptos", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: #172033;
+        background: #edf0f2;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-width: 1180px;
+        background:
+          linear-gradient(rgba(15, 23, 42, .024) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(15, 23, 42, .024) 1px, transparent 1px),
+          #edf0f2;
+        background-size: 30px 30px;
+      }
+
+      .shell {
+        width: 1360px;
+        margin: 0 auto;
+        padding: 42px 38px 52px;
+      }
+
+      .masthead {
+        display: grid;
+        grid-template-columns: 1fr 440px;
+        gap: 74px;
+        align-items: end;
+        padding: 0 4px 25px;
+        border-bottom: 1px solid #cbd2d9;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: #667085;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .22em;
+      }
+
+      h1 {
+        margin: 0;
+        color: #101828;
+        font-size: 39px;
+        line-height: 1.14;
+        letter-spacing: -.045em;
+      }
+
+      .masthead-copy {
+        margin: 0;
+        color: #667085;
+        font-size: 14px;
+        line-height: 1.85;
+      }
+
+      .key {
+        display: flex;
+        gap: 18px;
+        margin-top: 17px;
+        color: #667085;
+        font-size: 11px;
+      }
+
+      .key span::before {
+        content: "";
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        margin-right: 7px;
+        border-radius: 50%;
+        background: #98a2b3;
+      }
+
+      .key .live::before { background: #059669; }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-top: 22px;
+      }
+
+      .proposal {
+        min-height: 430px;
+        overflow: hidden;
+        border: 1px solid #d4dae1;
+        border-radius: 5px;
+        background: #fff;
+        box-shadow: 0 10px 26px rgba(16, 24, 40, .055);
+      }
+
+      .proposal.current { border-color: #86c9ad; }
+
+      .proposal-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        min-height: 98px;
+        padding: 18px 22px 16px;
+        border-bottom: 1px solid #eaecf0;
+      }
+
+      .proposal-number {
+        color: #98a2b3;
+        font-family: Georgia, serif;
+        font-size: 12px;
+        font-style: italic;
+      }
+
+      .proposal-title {
+        margin: 3px 0 0;
+        color: #101828;
+        font-size: 17px;
+        font-weight: 800;
+      }
+
+      .proposal-desc {
+        margin: 5px 0 0;
+        color: #667085;
+        font-size: 11px;
+      }
+
+      .color-chip {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 8px;
+        border: 1px solid #d0d5dd;
+        color: #667085;
+        font-family: Consolas, monospace;
+        font-size: 10px;
+      }
+
+      .color-chip i {
+        width: 12px;
+        height: 12px;
+        border: 1px solid rgba(16, 24, 40, .08);
+        border-radius: 2px;
+        background: var(--mark);
+      }
+
+      .article {
+        padding: 23px 25px 20px;
+        color: #4b5563;
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 15px;
+        line-height: 1.9;
+        letter-spacing: .8px;
+      }
+
+      .article h2 {
+        margin: 0 0 15px;
+        color: #1f2937;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: .4px;
+      }
+
+      .article p { margin: 0 0 15px; }
+
+      .article strong {
+        padding: 0 4px;
+        border-radius: 2px;
+        background: linear-gradient(120deg, var(--mark) 0%, rgba(255, 255, 255, 0) 100%);
+        color: #111827;
+        font-weight: 600;
+      }
+
+      .metric {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        margin: 18px 0;
+        border-top: 1px solid #e4e7ec;
+        border-bottom: 1px solid #e4e7ec;
+      }
+
+      .metric div { padding: 12px 0; }
+      .metric div + div { padding-left: 18px; border-left: 1px solid #e4e7ec; }
+      .metric b { display: block; color: #101828; font-size: 21px; line-height: 1.2; }
+      .metric small { color: #98a2b3; font-size: 10px; letter-spacing: .08em; }
+
+      .same-rule {
+        margin-top: 18px;
+        padding: 10px 12px;
+        background: #f8f9fb;
+        color: #7b8492;
+        font-size: 10px;
+        letter-spacing: .04em;
+      }
+
+      .amber { --mark: #fde68a; }
+      .champagne { --mark: #f2dfb0; }
+      .blue { --mark: #c9d9ea; }
+      .green { --mark: #cbe6d8; }
+      .apricot { --mark: #f1d2b5; }
+      .slate { --mark: #d6dde6; }
+
+      .footer-note {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 23px;
+        padding: 15px 4px 0;
+        border-top: 1px solid #cbd2d9;
+        color: #667085;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">BUSINESS MINIMAL / COLOR STUDY 03</p>
+          <h1>商务极简 · 加粗颜色对照</h1>
+          <div class="key">
+            <span class="live">当前正式颜色</span>
+            <span>仅改变高亮颜色</span>
+            <span>同一正文内容</span>
+          </div>
+        </div>
+        <p class="masthead-copy">六组方案使用完全相同的字重、渐变角度、内边距和圆角。玉石绿已经成为当前颜色，其余五项只替换渐变起始色。</p>
+      </header>
+
+      <section class="grid">
+        <article class="proposal amber">
+          <div class="proposal-head">
+            <div><span class="proposal-number">01</span><h2 class="proposal-title">琥珀黄</h2><p class="proposal-desc">明亮、醒目、带少量活力</p></div>
+            <span class="color-chip"><i></i>#FDE68A</span>
+          </div>
+          <div class="article">
+            <h2>增长进入效率阶段</h2>
+            <p>过去三个月，团队把资源集中到高意向客户后，<strong>有效商机提升 32%</strong>，销售周期也明显缩短。</p>
+            <div class="metric"><div><b>32%</b><small>有效商机</small></div><div><b>18 天</b><small>平均周期</small></div></div>
+            <p>下一阶段建议<strong>先稳定转化路径，再扩大投放规模</strong>，避免线索增长掩盖交付压力。</p>
+            <div class="same-rule">字重 600　渐变 120°　左右 4px　圆角 2px</div>
+          </div>
+        </article>
+
+        <article class="proposal champagne">
+          <div class="proposal-head">
+            <div><span class="proposal-number">02</span><h2 class="proposal-title">香槟金</h2><p class="proposal-desc">更低调，商务感更成熟</p></div>
+            <span class="color-chip"><i></i>#F2DFB0</span>
+          </div>
+          <div class="article">
+            <h2>增长进入效率阶段</h2>
+            <p>过去三个月，团队把资源集中到高意向客户后，<strong>有效商机提升 32%</strong>，销售周期也明显缩短。</p>
+            <div class="metric"><div><b>32%</b><small>有效商机</small></div><div><b>18 天</b><small>平均周期</small></div></div>
+            <p>下一阶段建议<strong>先稳定转化路径，再扩大投放规模</strong>，避免线索增长掩盖交付压力。</p>
+            <div class="same-rule">字重 600　渐变 120°　左右 4px　圆角 2px</div>
+          </div>
+        </article>
+
+        <article class="proposal blue">
+          <div class="proposal-head">
+            <div><span class="proposal-number">03</span><h2 class="proposal-title">雾霾蓝</h2><p class="proposal-desc">理性、专业、适合科技内容</p></div>
+            <span class="color-chip"><i></i>#C9D9EA</span>
+          </div>
+          <div class="article">
+            <h2>增长进入效率阶段</h2>
+            <p>过去三个月，团队把资源集中到高意向客户后，<strong>有效商机提升 32%</strong>，销售周期也明显缩短。</p>
+            <div class="metric"><div><b>32%</b><small>有效商机</small></div><div><b>18 天</b><small>平均周期</small></div></div>
+            <p>下一阶段建议<strong>先稳定转化路径，再扩大投放规模</strong>，避免线索增长掩盖交付压力。</p>
+            <div class="same-rule">字重 600　渐变 120°　左右 4px　圆角 2px</div>
+          </div>
+        </article>
+
+        <article class="proposal current green">
+          <div class="proposal-head">
+            <div><span class="proposal-number">04</span><h2 class="proposal-title">当前 · 玉石绿</h2><p class="proposal-desc">温和、清晰、贴合翠绿主题</p></div>
+            <span class="color-chip"><i></i>#CBE6D8</span>
+          </div>
+          <div class="article">
+            <h2>增长进入效率阶段</h2>
+            <p>过去三个月，团队把资源集中到高意向客户后，<strong>有效商机提升 32%</strong>，销售周期也明显缩短。</p>
+            <div class="metric"><div><b>32%</b><small>有效商机</small></div><div><b>18 天</b><small>平均周期</small></div></div>
+            <p>下一阶段建议<strong>先稳定转化路径，再扩大投放规模</strong>，避免线索增长掩盖交付压力。</p>
+            <div class="same-rule">字重 600　渐变 120°　左右 4px　圆角 2px</div>
+          </div>
+        </article>
+
+        <article class="proposal apricot">
+          <div class="proposal-head">
+            <div><span class="proposal-number">05</span><h2 class="proposal-title">暖杏色</h2><p class="proposal-desc">温暖但克制，适合案例故事</p></div>
+            <span class="color-chip"><i></i>#F1D2B5</span>
+          </div>
+          <div class="article">
+            <h2>增长进入效率阶段</h2>
+            <p>过去三个月，团队把资源集中到高意向客户后，<strong>有效商机提升 32%</strong>，销售周期也明显缩短。</p>
+            <div class="metric"><div><b>32%</b><small>有效商机</small></div><div><b>18 天</b><small>平均周期</small></div></div>
+            <p>下一阶段建议<strong>先稳定转化路径，再扩大投放规模</strong>，避免线索增长掩盖交付压力。</p>
+            <div class="same-rule">字重 600　渐变 120°　左右 4px　圆角 2px</div>
+          </div>
+        </article>
+
+        <article class="proposal slate">
+          <div class="proposal-head">
+            <div><span class="proposal-number">06</span><h2 class="proposal-title">冷灰蓝</h2><p class="proposal-desc">最克制，适合报告与复盘</p></div>
+            <span class="color-chip"><i></i>#D6DDE6</span>
+          </div>
+          <div class="article">
+            <h2>增长进入效率阶段</h2>
+            <p>过去三个月，团队把资源集中到高意向客户后，<strong>有效商机提升 32%</strong>，销售周期也明显缩短。</p>
+            <div class="metric"><div><b>32%</b><small>有效商机</small></div><div><b>18 天</b><small>平均周期</small></div></div>
+            <p>下一阶段建议<strong>先稳定转化路径，再扩大投放规模</strong>，避免线索增长掩盖交付压力。</p>
+            <div class="same-rule">字重 600　渐变 120°　左右 4px　圆角 2px</div>
+          </div>
+        </article>
+      </section>
+
+      <footer class="footer-note">
+        <span>当前仅更新颜色展示页，正式排版规则保持不变</span>
+        <span>六组方案只有高亮色不同</span>
+      </footer>
+    </main>
+  </body>
+</html>

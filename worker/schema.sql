@@ -27,6 +27,14 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   window_start TEXT
 );
 
+-- Daily AI usage per subject (user:<id> or ip:<addr>), for quota enforcement
+CREATE TABLE IF NOT EXISTS ai_usage (
+  subject_key TEXT NOT NULL,
+  day TEXT NOT NULL,             -- UTC date, YYYY-MM-DD
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (subject_key, day)
+);
+
 -- Presets Table for Saving User Combinations
 CREATE TABLE IF NOT EXISTS presets (
   id TEXT PRIMARY KEY,
@@ -94,3 +102,27 @@ CREATE INDEX IF NOT EXISTS idx_illustration_jobs_status ON illustration_jobs(sta
 CREATE INDEX IF NOT EXISTS idx_illustration_items_job_id ON illustration_items(job_id);
 CREATE INDEX IF NOT EXISTS idx_illustration_items_status ON illustration_items(status);
 CREATE INDEX IF NOT EXISTS idx_illustration_artifacts_job_id ON illustration_artifacts(job_id);
+
+-- Feishu OAuth tokens per user (路线 B：飞书文档同步)
+CREATE TABLE IF NOT EXISTS feishu_tokens (
+  user_id TEXT PRIMARY KEY,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  feishu_user_name TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_feishu_tokens_expires ON feishu_tokens(expires_at);
+
+-- Per-user Feishu app credentials (BYO App 模式：每个用户填自己创建的自建应用)
+CREATE TABLE IF NOT EXISTS feishu_apps (
+  user_id TEXT PRIMARY KEY,
+  app_id TEXT NOT NULL,
+  app_secret TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

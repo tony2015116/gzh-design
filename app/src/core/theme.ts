@@ -1,9 +1,17 @@
+import type { EmphasisConfig } from './emphasis';
+import type { TypographyConfig } from './typography';
+import type { ComponentStyleConfig } from './componentStyle';
+
 export interface Theme {
   id: string;
   name: string;
   primary: string;
   secondary: string;
   highlight: string;
+  emphasis?: string;
+  emphasisConfig?: EmphasisConfig;
+  typographyConfig?: TypographyConfig;
+  componentStyleConfig?: ComponentStyleConfig;
   gradient: string;
 }
 
@@ -14,6 +22,7 @@ export const THEMES: Record<string, Theme> = {
     primary: '#059669', // emerald-600
     secondary: '#10B981', // emerald-500
     highlight: '#FDE68A', // amber-200
+    emphasis: '#CBE6D8', // jade green for minimalist inline emphasis
     gradient: 'linear-gradient(135deg, #059669, #10B981)',
   },
   ocean: {

@@ -19,6 +19,26 @@ const SYNTAX_DATA = [
         desc: '适合小节分隔，可以把 STEP01 换成任意标签。',
         code: '## STEP01 | **基础排版支持**',
       },
+      {
+        name: '三级标题',
+        desc: '章节内再切一层小节时使用；短文章通常用不到，长文（>1500 字）里出现 1-3 个即可。左侧竖条 + 可选标签。',
+        code: '### 准备工作 | 环境检查清单',
+      },
+      {
+        name: '四级标题',
+        desc: '小节内的横切板块，装置换成"文字下划线"，和三级视觉上区分开。仅当一节真的有并列子板块时才用。',
+        code: '#### 常见误区',
+      },
+      {
+        name: '五级标题',
+        desc: '要点级小标题，前缀是 accent 色 ◆。多数时候用无序列表就够，只有要点本身还带一段展开时才升为五级。',
+        code: '##### 关键指标',
+      },
+      {
+        name: '六级标题',
+        desc: '注释/补充说明的备注型，灰字 + — 前缀，不进阅读主线。绝大多数文章都用不到。',
+        code: '###### 数据来源：内部埋点，2026 Q1',
+      },
     ],
   },
   {
@@ -30,6 +50,16 @@ const SYNTAX_DATA = [
         code: '**加粗突出文字**',
       },
       {
+        name: '斜体',
+        desc: '适合语气提示、书名和轻量补充信息。',
+        code: '*这是一段斜体文字*',
+      },
+      {
+        name: '删除线',
+        desc: '适合展示被替换的方案、旧价格或修订内容。',
+        code: '原价 ~~199 元~~，现价 99 元。',
+      },
+      {
         name: '高亮链接',
         desc: '会渲染成更适合公众号的强调链接样式。',
         code: '[点击查看资料](https://mp.weixin.qq.com)',
@@ -39,15 +69,40 @@ const SYNTAX_DATA = [
         desc: '适合展示关键词、参数名和命令片段。',
         code: '这里有一个 `核心概念` 需要单独强调。',
       },
+      {
+        name: '段内换行',
+        desc: '连续两行文字会保留换行，适合短句、署名和诗歌。',
+        code: '第一行文字\n第二行文字',
+      },
+      {
+        name: '转义字符',
+        desc: '在语法符号前加反斜杠，可以按普通文字显示。',
+        code: '\\*这里不会变成斜体\\*',
+      },
     ],
   },
   {
-    category: '组件与块',
+    category: '列表与内容块',
     items: [
+      {
+        name: '无序列表',
+        desc: '适合并列观点、功能清单和要点总结。',
+        code: '- 第一项\n- 第二项\n- 第三项',
+      },
+      {
+        name: '有序列表',
+        desc: '适合步骤、排名和有先后关系的流程。',
+        code: '1. 准备内容\n2. 选择方案\n3. 复制到公众号',
+      },
       {
         name: '引用',
         desc: '适合展示结论、观点和引导语。',
         code: '> 这里是一段引用内容，可以拿来展示观点或总结。',
+      },
+      {
+        name: '分割线',
+        desc: '用于切换章节或拉开内容节奏。',
+        code: '---',
       },
       {
         name: '表格',
@@ -59,10 +114,65 @@ const SYNTAX_DATA = [
         desc: '会渲染成适合阅读的代码展示卡片。',
         code: '```javascript\nconsole.log("Hello, WeChat!");\n```',
       },
+    ],
+  },
+  {
+    category: '图片与图组',
+    items: [
+      {
+        name: '单张图片',
+        desc: '单独一行插入图片，会使用当前图片样式渲染。',
+        code: '![图片说明](https://example.com/image.jpg)',
+      },
       {
         name: '横排图组',
         desc: '同一行连续插入多张图片，会自动渲染成横向拼图。',
         code: '![插图1](https://img1.com) ![插图2](https://img2.com)',
+      },
+      {
+        name: '超长图滚动容器',
+        desc: '预览时在固定高度内上下滑动，复制到公众号默认展开完整长图。使用 copy="scroll" 可显式保留滚动。',
+        code: '<LongImageCard title="完整长图" height="360" hint="上下滑动查看长图">\n![长图说明](https://example.com/long-image.jpg)\n</LongImageCard>',
+      },
+    ],
+  },
+  {
+    category: '高级排版组件',
+    items: [
+      {
+        name: '信息卡片',
+        desc: '适合展示提醒、背景信息和单段重点内容。',
+        code: '<InfoCard title="关键提示">\n卡片正文支持 **加粗**、*斜体* 和 `行内代码`。\n</InfoCard>',
+      },
+      {
+        name: '总结卡片',
+        desc: '适合章节结尾和全文总结，可自动识别列表项。',
+        code: '<SummaryCard title="本节总结">\n这是一段总结说明。\n- 结论一\n- 结论二\n- 结论三\n</SummaryCard>',
+      },
+      {
+        name: '长文滑动容器',
+        desc: '限制展示高度，适合日志、代码、数据和资料摘录。右侧提示词可用 hint 自定义，设置为空可隐藏。',
+        code: '<ScrollCard title="接口返回" height="220" hint="滑动查看">\n这里放很长的内容，预览时可在容器内部滑动查看。\n</ScrollCard>',
+      },
+    ],
+  },
+  {
+    category: '整篇结构组件',
+    items: [
+      {
+        name: '开篇封面',
+        desc: '放在文章最前面。kicker 是栏目标签，date 是日期，subtitle 是副标题，正文写一两句导语；属性都可省略。',
+        code: '<CoverCard kicker="AI 观察" date="2026.11.05" title="主标题写这里" subtitle="一句话副标题">\n导语：这篇文章想讲清楚的一件事。\n</CoverCard>',
+      },
+      {
+        name: '本文导读',
+        desc: '列出本文看点。不写条目时自动取全文二级标题（最多 6 条）。',
+        code: '<TocCard title="本文导读">\n- 看点一\n- 看点二\n- 看点三\n</TocCard>',
+      },
+      {
+        name: '文末签名',
+        desc: '放在文章末尾。avatar 填头像图片地址，正文写一句简介；cta 自定义底部引导语，写 cta="" 可隐藏。',
+        code: '<AuthorCard name="你的署名" avatar="https://example.com/avatar.jpg">\n一句话介绍你自己\n</AuthorCard>',
       },
     ],
   },
@@ -96,7 +206,7 @@ export const CheatsheetModal: React.FC<CheatsheetModalProps> = ({ onClose }) => 
               </div>
               <h2 className="mt-2 text-xl font-bold text-slate-900">排版语法速查表</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                挑一段语法直接复制到编辑器里，就能快速验证当前主题和版式效果。
+                完整收录当前支持的标题、文字、列表、内容块、图片和高级组件。
               </p>
             </div>
 

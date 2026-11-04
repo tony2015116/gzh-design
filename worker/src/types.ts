@@ -12,9 +12,15 @@ export interface Env {
   OPENAI_MODEL?: string;
   GEMINI_API_KEY?: string;
   GEMINI_IMAGE_MODEL?: string;
+  FEISHU_APP_ID?: string;
+  FEISHU_APP_SECRET?: string;
   AI_FORMAT_AUTH_MODE?: string;
   AI_FORMAT_LOG_LEVEL?: string;
   AI_FORMAT_LOG_PREVIEW_CHARS?: string;
+  AI_MAX_INPUT_CHARS?: string;
+  AI_DAILY_QUOTA_ANONYMOUS?: string;
+  AI_DAILY_QUOTA_FREE?: string;
+  AI_DAILY_QUOTA_VIP?: string;
 }
 
 export type AuthenticatedUser = {

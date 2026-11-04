@@ -33,6 +33,57 @@ const parseJsonBody = async (response: Response): Promise<any> => {
 };
 
 /**
+ * 读取 SSE 流式响应并拼接完整内容。
+ * 长文生成时流式是必须的：非流式请求会让中转的 Cloudflare 边缘
+ * 等待源站超过 100 秒，直接返回 524 超时错误页。
+ */
+const parseSseStream = async (response: Response): Promise<string> => {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('当前环境不支持流式读取，请升级浏览器。');
+  }
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let content = '';
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const data = trimmed.slice(5).trim();
+      if (data === '[DONE]') continue;
+      try {
+        const json = JSON.parse(data);
+        const delta = json?.choices?.[0]?.delta?.content;
+        if (typeof delta === 'string') content += delta;
+      } catch {
+        /* 忽略跨分片的不完整 JSON 行 */
+      }
+    }
+  }
+  return content;
+};
+
+/** 统一读取响应：流式走 SSE 拼接，非流式按 JSON 解析 */
+const readCompletionContent = async (response: Response): Promise<string> => {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/event-stream')) {
+    const content = await parseSseStream(response);
+    if (!content) {
+      throw new Error('AI 返回了空内容，请重试。');
+    }
+    return content;
+  }
+  const data = await parseJsonBody(response);
+  return data?.choices?.[0]?.message?.content || '';
+};
+
+/**
  * OSS 模式下调用 OpenAI 兼容 chat/completions，返回 message content。
  * 开发环境走 vite dev server 的同源代理 /__ai-proxy（部分第三方中转没有
  * CORS 头，浏览器直连会被拦截）；生产构建只能直连，要求中转支持跨域。
@@ -52,6 +103,8 @@ export const ossChatCompletion = async ({
       { role: 'user', content: userContent },
     ],
     temperature,
+    // 流式：避免长文生成时中转的 Cloudflare 边缘 100 秒无响应超时（524）
+    stream: true,
   };
 
   if (import.meta.env.DEV) {
@@ -69,8 +122,7 @@ export const ossChatCompletion = async ({
       await parseErrorResponse(response, 'AI 请求失败（dev 代理）');
     }
 
-    const data = await parseJsonBody(response);
-    return data?.choices?.[0]?.message?.content || '';
+    return readCompletionContent(response);
   }
 
   const response = await fetch(endpoint, {
@@ -86,8 +138,7 @@ export const ossChatCompletion = async ({
     await parseErrorResponse(response, 'AI 请求失败');
   }
 
-  const data = await parseJsonBody(response);
-  return data?.choices?.[0]?.message?.content || '';
+  return readCompletionContent(response);
 };
 
 /** 把用户配置的 base URL 归一化成 chat/completions 端点 */

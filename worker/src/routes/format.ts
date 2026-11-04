@@ -3,6 +3,10 @@ import { createTraceId, getBearerToken, jsonResponse } from '../lib/http';
 import { authenticateUser } from '../lib/auth';
 import { getAiFormatAuthMode } from '../lib/permissions';
 import { getFormatPreviewChars, logFormatEvent, truncateForLog } from '../lib/logging';
+import { FORMAT_PROMPT } from '../lib/formatPrompt';
+import { buildFormatPreferencePrompt, normalizeFormatPreferences, sanitizeFormatCustomNote } from '../lib/formatPreferences';
+import { checkInputLength, consumeDailyQuota, refundDailyQuota, resolveQuotaSubject, resolveUpstreamConfig } from '../lib/aiGuard';
+import { callUpstreamChat, toChatCompletionResponse, UpstreamChatError } from '../lib/upstreamChat';
 
 export async function handleFormat(
   request: Request,
@@ -92,42 +96,41 @@ export async function handleFormat(
     return jsonResponse({ error: '缺少 markdown 字段' }, 400, cors);
   }
 
-  const defaultAIPrompt = `
-你是一个专业的微信公众号排版助手。请在不改变原意的前提下，对用户提供的 Markdown 做结构化优化。
+  const preferences = normalizeFormatPreferences(body?.preferences);
+  const customNote = sanitizeFormatCustomNote(body?.customNote);
+  const systemPrompt = FORMAT_PROMPT + buildFormatPreferencePrompt(preferences, customNote);
 
-你的目标：
-1. 补全必要的标题层级。
-2. 强调重点句和结论句。
-3. 适度插入引用、分割线、总结卡片和信息卡片。
-4. 保持输出仍然是可被排版系统解析的 Markdown。
+  const inputError = checkInputLength(env, markdown);
+  if (inputError) {
+    logFormatEvent(env, traceId, 'request.too_large', { markdownLength: markdown.length });
+    return jsonResponse({ error: inputError }, 413, cors);
+  }
 
-输出规则：
-- 只返回改写后的 Markdown。
-- 不要输出解释、前言或代码围栏。
-- 如需总结卡片，可输出 <SummaryCard title="摘要">内容</SummaryCard>
-- 如需信息卡片，可输出 <InfoCard title="提示">内容</InfoCard>
-- 一级标题支持：# 序号 | 主标题 | 副标题
-- 二级标题支持：## STEP01 | 小节标题
-`;
+  // 客户端传来的 baseUrl / model 一律忽略，只用服务端配置（防止 OPENAI_API_KEY 被转发到第三方地址）
+  const { endpoint, model: modelName } = resolveUpstreamConfig(env);
 
-  const baseUrl = body.baseUrl || env.OPENAI_API_BASE || 'https://api.openai.com/v1';
-  const modelName = body.model || env.OPENAI_MODEL || 'gpt-4o';
-  let endpoint = baseUrl;
-  if (!endpoint.endsWith('chat/completions')) {
-    endpoint = endpoint.endsWith('/') ? `${endpoint}chat/completions` : `${endpoint}/chat/completions`;
+  const usedSecret = !authenticatedUser && Boolean(env.UPLOAD_SECRET) && bearerToken === env.UPLOAD_SECRET;
+  const quotaSubject = resolveQuotaSubject(request, authenticatedUser, usedSecret);
+  try {
+    const quota = await consumeDailyQuota(env, quotaSubject);
+    if (!quota.ok) {
+      logFormatEvent(env, traceId, 'quota.exceeded', { subject: quotaSubject?.key || '', limit: quota.limit });
+      return jsonResponse({ error: `今日 AI 调用次数已用完（每日 ${quota.limit} 次），请明天再试` }, 429, cors);
+    }
+  } catch (err: any) {
+    logFormatEvent(env, traceId, 'quota.error', { message: err?.message || 'unknown' });
+    return jsonResponse({ error: '服务端额度表未初始化，请执行 schema.sql 中的 ai_usage 建表语句' }, 500, cors);
   }
 
   logFormatEvent(env, traceId, 'request.parsed', {
     markdownLength: markdown.length,
     markdownPreview: truncateForLog(markdown, previewChars),
-    requestedBaseUrl: body.baseUrl || '',
     resolvedEndpoint: endpoint,
-    requestedModel: body.model || '',
     resolvedModel: modelName,
-    hasCustomBaseUrl: Boolean(body.baseUrl),
-    hasCustomModel: Boolean(body.model),
     userId: authenticatedUser?.id || '',
     userRole: authenticatedUser?.role || '',
+    preferences,
+    customNote: truncateForLog(customNote, previewChars),
   });
 
   try {
@@ -136,64 +139,43 @@ export async function handleFormat(
       endpoint,
       model: modelName,
       temperature: 0.7,
-      promptChars: defaultAIPrompt.length,
+      streamed: true,
+      promptChars: systemPrompt.length,
       markdownChars: markdown.length,
     }, 'verbose');
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: modelName,
-        messages: [
-          { role: 'system', content: defaultAIPrompt },
-          { role: 'user', content: markdown },
-        ],
-        temperature: 0.7,
-      }),
+    // 流式请求：避免长文生成时中转的 Cloudflare 边缘 100 秒无响应超时（524）
+    const content = await callUpstreamChat({
+      endpoint,
+      apiKey: env.OPENAI_API_KEY,
+      model: modelName,
+      systemPrompt,
+      userContent: markdown,
+      temperature: 0.7,
     });
 
     const upstreamDurationMs = Date.now() - upstreamStartedAt;
-    const upstreamRequestId = response.headers.get('x-request-id')
-      ?? response.headers.get('openai-request-id')
-      ?? response.headers.get('cf-ray')
-      ?? '';
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logFormatEvent(env, traceId, 'upstream.request.failed', {
-        status: response.status,
-        statusText: response.statusText,
-        durationMs: upstreamDurationMs,
-        upstreamRequestId,
-        errorPreview: truncateForLog(errorText, previewChars),
-      });
-      return jsonResponse({ error: '上游 AI 请求失败', details: errorText }, response.status, cors);
-    }
-
-    const data: any = await response.json();
-    const content = data?.choices?.[0]?.message?.content || '';
-    const finishReason = data?.choices?.[0]?.finish_reason || '';
-    const usage = data?.usage || null;
 
     logFormatEvent(env, traceId, 'upstream.request.succeeded', {
-      status: response.status,
       durationMs: upstreamDurationMs,
-      upstreamRequestId,
-      finishReason,
-      outputChars: typeof content === 'string' ? content.length : 0,
-      usage,
+      streamed: true,
+      outputChars: content.length,
     });
     logFormatEvent(env, traceId, 'request.completed', {
       totalDurationMs: Date.now() - startedAt,
-      outputPreview: typeof content === 'string' ? truncateForLog(content, previewChars) : '',
+      outputPreview: truncateForLog(content, previewChars),
     }, 'verbose');
 
-    return jsonResponse(data, 200, cors);
+    return jsonResponse(toChatCompletionResponse(content), 200, cors);
   } catch (err: any) {
+    await refundDailyQuota(env, quotaSubject);
+    if (err instanceof UpstreamChatError) {
+      logFormatEvent(env, traceId, 'upstream.request.failed', {
+        status: err.status,
+        errorPreview: truncateForLog(err.details, previewChars),
+      });
+      return jsonResponse({ error: '上游 AI 请求失败', details: err.details }, err.status, cors);
+    }
     logFormatEvent(env, traceId, 'worker.exception', {
       totalDurationMs: Date.now() - startedAt,
       message: err?.message || 'unknown',

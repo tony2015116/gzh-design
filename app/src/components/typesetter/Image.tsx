@@ -3,6 +3,8 @@ import { DEFAULT_THEME } from '../../core/theme';
 import type { Theme } from '../../core/theme';
 import { DEFAULT_LAYOUT_STYLE, DEFAULT_IMAGE_STYLE } from '../../core/style';
 import type { LayoutStyle, ImageStyle } from '../../core/style';
+import { DEFAULT_COMPONENT_STYLE_CONFIG, getFrameStyleOverrides } from '../../core/componentStyle';
+import type { ComponentStyleConfig } from '../../core/componentStyle';
 
 interface ImageItem {
   src: string;
@@ -16,9 +18,18 @@ interface ImageProps {
   theme?: Theme;
   layoutStyle?: LayoutStyle;
   imageStyle?: ImageStyle;
+  componentStyle?: ComponentStyleConfig;
 }
 
-export const ImageComponent: React.FC<ImageProps> = ({ src, alt, images, theme = DEFAULT_THEME, layoutStyle = DEFAULT_LAYOUT_STYLE, imageStyle = DEFAULT_IMAGE_STYLE }) => {
+export const ImageComponent: React.FC<ImageProps> = ({
+  src,
+  alt,
+  images,
+  theme = DEFAULT_THEME,
+  layoutStyle = DEFAULT_LAYOUT_STYLE,
+  imageStyle = DEFAULT_IMAGE_STYLE,
+  componentStyle = DEFAULT_COMPONENT_STYLE_CONFIG,
+}) => {
   const getStyle = (): React.CSSProperties => {
     switch (imageStyle.id) {
       case 'card':
@@ -48,6 +59,7 @@ export const ImageComponent: React.FC<ImageProps> = ({ src, alt, images, theme =
         }
     }
   };
+  const frameStyle = getFrameStyleOverrides(componentStyle, theme.primary, 'image');
 
   // Multi-image horizontal gallery
   if (images && images.length > 1) {
@@ -73,7 +85,8 @@ export const ImageComponent: React.FC<ImageProps> = ({ src, alt, images, theme =
               marginLeft: idx === 0 ? '0' : `${gapPx}px`,
               boxSizing: 'border-box',
               overflow: 'hidden',
-              ...getStyle()
+              ...getStyle(),
+              ...frameStyle,
             }}
           >
             <img
@@ -87,10 +100,10 @@ export const ImageComponent: React.FC<ImageProps> = ({ src, alt, images, theme =
     );
   }
 
-  // Single image (default)
+  // Single image (default)：按图片自身尺寸显示、只限最大宽度，小图不会被拉伸变糊
   return (
-    <section style={{ textAlign: 'center', marginBottom: '16px', overflow: 'hidden', ...getStyle() }}>
-      <img src={src} alt={alt || 'image'} style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 'inherit' }} />
+    <section style={{ textAlign: 'center', marginBottom: '16px', overflow: 'hidden', ...getStyle(), ...frameStyle }}>
+      <img src={src} alt={alt || 'image'} style={{ maxWidth: '100%', width: 'auto', height: 'auto', display: 'block', margin: '0 auto', borderRadius: 'inherit' }} />
     </section>
   );
 };

@@ -42,9 +42,10 @@ export const TableComponent: React.FC<TableComponentProps> = ({ headers, rows, t
       borderCollapse: layoutStyle.id === 'cute' ? 'separate' : 'collapse',
       borderSpacing: 0,
       textAlign: 'left', 
-      fontSize: '13px', 
-      lineHeight: 1.6, 
-      marginBottom: '24px', 
+      fontSize: 'var(--body-font-size)',
+      lineHeight: 'var(--body-line-height)',
+      marginBottom: 'var(--paragraph-spacing)',
+      fontFamily: 'var(--body-font-family)',
       borderRadius: layoutStyle.id === 'cute' ? '12px' : '0',
       overflow: 'hidden',
       ...s.table 

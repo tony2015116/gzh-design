@@ -1,39 +1,18 @@
 import { getAuthMode } from '../services/accessControl';
 import { getAuthToken } from '../services/authService';
 import { loadR2Config } from '../services/imageUpload';
-import { resolveChatEndpoint } from './chatCompletion';
+import { FORMAT_PROMPT } from './formatPrompt';
+import { buildFormatPreferencePrompt, type FormatPreferences } from './formatPreferences';
+import { resolveChatEndpoint, ossChatCompletion } from './chatCompletion';
 import { createOssAiTraceId, getOssAiLogPreview, logOssAiEvent } from '../services/ossAiDebugLogger';
-
-export const defaultAIPrompt = `
-你是一个专业的微信公众号排版助手。
-你的目标是分析给定的 Markdown 文章，自动识别导语、重点句、总结段落，并推荐插入强调组件、引用组件、总结卡片、信息卡片、分割线等。
-
-由于排版系统是基于组件的，请直接返回修改后的 Markdown。
-例如：
-- 如果某句话要强调，把它变成 **这段文字**
-- 如果是引用语，变成 > 引用
-- 如果是总结卡片，可以插入 <SummaryCard title="摘要">内容</SummaryCard>
-- 如果是信息卡片，可以插入 <InfoCard title="提示">内容</InfoCard>
-
-对于标题，请使用 | 做高级自定义：
-- 一级标题支持：# 序号 | 主标题 | 小字副标题
-- 二级标题支持：## 序号标签 | 主标题
-- 如需局部颜色强调，可直接嵌入 HTML，例如：
-  ## STEP02 | <span style="color:#059669">深度解析</span>
-
-最简策略是直接将原 Markdown 按下面规则改写并返回：
-- 加上必要的带序号的 # 或 ## 标题
-- 重点加粗 **内容**
-- 适当添加 --- 分割线
-
-只返回改写后的 Markdown 文本，不要输出任何解释。
-`;
 
 export const getAITypesetMarkdown = async (
   apiKey: string,
   markdown: string,
   baseUrl?: string,
   model?: string,
+  preferences?: FormatPreferences,
+  customNote?: string,
 ) => {
   const isOnlineMode = import.meta.env.VITE_APP_MODE === 'online';
   const traceId = createOssAiTraceId();
@@ -59,7 +38,8 @@ export const getAITypesetMarkdown = async (
         'Content-Type': 'application/json',
         ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
       },
-      body: JSON.stringify({ markdown, baseUrl: finalBaseUrl, model: finalModel }),
+      // 上游地址与模型由 Worker 端配置决定，不再从前端传入
+      body: JSON.stringify({ markdown, preferences, customNote }),
     });
 
     if (!response.ok) {
@@ -97,75 +77,44 @@ export const getAITypesetMarkdown = async (
     markdownPreview: getOssAiLogPreview(markdown),
     hasCustomBaseUrl: Boolean(baseUrl),
     hasCustomModel: Boolean(model),
+    preferences,
+    customNote,
   });
 
   const startedAt = Date.now();
-  const payload = {
-    model: finalModel,
-    messages: [
-      { role: 'system', content: defaultAIPrompt },
-      { role: 'user', content: markdown },
-    ],
-    temperature: 0.7,
-  };
-  // 开发环境走 vite dev server 的同源代理，绕开部分第三方中转缺失 CORS 头的问题
-  const useDevProxy = import.meta.env.DEV;
-  const response = await fetch(useDevProxy ? '/__ai-proxy' : endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(useDevProxy ? {} : { Authorization: `Bearer ${apiKey}` }),
-    },
-    body: JSON.stringify(
-      useDevProxy ? { endpoint, headers: { Authorization: `Bearer ${apiKey}` }, payload } : payload
-    ),
-  });
-  const durationMs = Date.now() - startedAt;
-
-  if (!response.ok) {
-    const errTxt = await response.text().catch(() => '');
-    console.error('OSS AI format error: Status =', response.status, 'Response =', errTxt);
-    await logOssAiEvent(traceId, 'request.failed', {
-      endpoint,
-      model: finalModel,
-      status: response.status,
-      statusText: response.statusText,
-      durationMs,
-      errorPreview: getOssAiLogPreview(errTxt),
-    });
-
-    let errMsg = `AI 排版请求失败 (Status: ${response.status})`;
-    try {
-      const data = JSON.parse(errTxt);
-      if (data.error?.message) errMsg = data.error.message;
-    } catch {}
-
-    throw new Error(`${errMsg}\n详细信息: ${errTxt.slice(0, 200)}...`);
-  }
-
-  let data: any;
+  // 统一走 ossChatCompletion（流式请求，避免长文触发中转 524 超时；
+  // 流式没有 usage/finishReason，成功日志只记录内容与耗时）
   try {
-    data = await response.json();
-  } catch {
+    const content = await ossChatCompletion({
+      endpoint,
+      apiKey,
+      model: finalModel,
+      systemPrompt: FORMAT_PROMPT + buildFormatPreferencePrompt(preferences, customNote),
+      userContent: markdown,
+      temperature: 0.7,
+    });
+    const durationMs = Date.now() - startedAt;
+
+    await logOssAiEvent(traceId, 'request.succeeded', {
+      endpoint,
+      model: finalModel,
+      durationMs,
+      streamed: true,
+      outputLength: typeof content === 'string' ? content.length : 0,
+      outputPreview: typeof content === 'string' ? getOssAiLogPreview(content) : '',
+    });
+
+    return content;
+  } catch (err: any) {
+    const durationMs = Date.now() - startedAt;
+    const errMsg = err?.message || 'unknown';
+    console.error('OSS AI format error:', errMsg);
     await logOssAiEvent(traceId, 'request.failed', {
       endpoint,
       model: finalModel,
       durationMs,
-      reason: 'non_json_response',
+      errorPreview: getOssAiLogPreview(errMsg),
     });
-    throw new Error('接口返回的不是 JSON，多半是接口地址配错了（最常见：Base URL 漏了 /v1）。');
+    throw err;
   }
-  const content = data.choices?.[0]?.message?.content || markdown;
-
-  await logOssAiEvent(traceId, 'request.succeeded', {
-    endpoint,
-    model: finalModel,
-    durationMs,
-    outputLength: typeof content === 'string' ? content.length : 0,
-    outputPreview: typeof content === 'string' ? getOssAiLogPreview(content) : '',
-    finishReason: data.choices?.[0]?.finish_reason || '',
-    usage: data.usage || null,
-  });
-
-  return content;
 };

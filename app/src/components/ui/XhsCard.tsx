@@ -210,13 +210,13 @@ function CoverCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'cove
             fontSize: 108,
             lineHeight: 1.22,
             letterSpacing: '0.04em',
-            wordBreak: 'break-all',
+            wordBreak: 'normal', overflowWrap: 'anywhere',
           }}
         >
           {card.title}
         </div>
         {card.subtitle && (
-          <div style={{ marginTop: 40, fontSize: 38, lineHeight: 1.5, color: theme.subtle, wordBreak: 'break-all' }}>
+          <div style={{ marginTop: 40, fontSize: 38, lineHeight: 1.5, color: theme.subtle, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
             {card.subtitle}
           </div>
         )}
@@ -250,7 +250,7 @@ function ChecklistCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: '
   return (
     <>
       <Kicker theme={theme}>{card.kicker}</Kicker>
-      <div style={{ marginTop: 28, fontSize: 68, fontWeight: 800, lineHeight: 1.25, wordBreak: 'break-all' }}>
+      <div style={{ marginTop: 28, fontSize: 68, fontWeight: 800, lineHeight: 1.25, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
         {card.heading}
       </div>
       <div style={{ marginTop: 48, flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -270,9 +270,9 @@ function ChecklistCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: '
               {String(i + 1).padStart(2, '0')}
             </span>
             <div>
-              <div style={{ fontSize: 42, fontWeight: 700, lineHeight: 1.3, wordBreak: 'break-all' }}>{item.label}</div>
+              <div style={{ fontSize: 42, fontWeight: 700, lineHeight: 1.3, wordBreak: 'normal', overflowWrap: 'anywhere' }}>{item.label}</div>
               {item.detail && (
-                <div style={{ marginTop: 8, fontSize: 30, lineHeight: 1.45, color: theme.subtle, wordBreak: 'break-all' }}>
+                <div style={{ marginTop: 8, fontSize: 30, lineHeight: 1.45, color: theme.subtle, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
                   {item.detail}
                 </div>
               )}
@@ -288,7 +288,7 @@ function StepsCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'step
   return (
     <>
       <Kicker theme={theme}>{card.kicker}</Kicker>
-      <div style={{ marginTop: 28, fontSize: 68, fontWeight: 800, lineHeight: 1.25, wordBreak: 'break-all' }}>
+      <div style={{ marginTop: 28, fontSize: 68, fontWeight: 800, lineHeight: 1.25, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
         {card.heading}
       </div>
       <div style={{ marginTop: 56, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -312,9 +312,9 @@ function StepsCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'step
               {String(i + 1).padStart(2, '0')}
             </div>
             <div style={{ paddingTop: 6 }}>
-              <div style={{ fontSize: 46, fontWeight: 800, lineHeight: 1.3, wordBreak: 'break-all' }}>{step.title}</div>
+              <div style={{ fontSize: 46, fontWeight: 800, lineHeight: 1.3, wordBreak: 'normal', overflowWrap: 'anywhere' }}>{step.title}</div>
               {step.desc && (
-                <div style={{ marginTop: 10, fontSize: 31, lineHeight: 1.5, color: theme.subtle, wordBreak: 'break-all' }}>
+                <div style={{ marginTop: 10, fontSize: 31, lineHeight: 1.5, color: theme.subtle, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
                   {step.desc}
                 </div>
               )}
@@ -355,7 +355,7 @@ function CompareCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'co
       </div>
       <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 22 }}>
         {data.points.map((p, i) => (
-          <div key={i} style={{ display: 'flex', gap: 16, fontSize: 33, lineHeight: 1.45, wordBreak: 'break-all' }}>
+          <div key={i} style={{ display: 'flex', gap: 16, fontSize: 33, lineHeight: 1.45, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
             <span style={{ color: dimmed ? theme.subtle : theme.accent, fontWeight: 800 }}>{dimmed ? '×' : '✓'}</span>
             <span>{p}</span>
           </div>
@@ -367,7 +367,7 @@ function CompareCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'co
   return (
     <>
       <Kicker theme={theme}>{card.kicker}</Kicker>
-      <div style={{ marginTop: 28, fontSize: 68, fontWeight: 800, lineHeight: 1.25, wordBreak: 'break-all' }}>
+      <div style={{ marginTop: 28, fontSize: 68, fontWeight: 800, lineHeight: 1.25, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
         {card.heading}
       </div>
       <div style={{ marginTop: 48, flex: 1, display: 'flex', flexDirection: 'column', gap: 36 }}>
@@ -393,7 +393,7 @@ function QuoteCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'quot
             fontSize: 78,
             lineHeight: 1.4,
             letterSpacing: '0.03em',
-            wordBreak: 'break-all',
+            wordBreak: 'normal', overflowWrap: 'anywhere',
           }}
         >
           {card.quote}
@@ -410,14 +410,14 @@ function DataCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'data'
   return (
     <>
       <Kicker theme={theme}>{card.kicker}</Kicker>
-      <div style={{ marginTop: 28, fontSize: 68, fontWeight: 800, lineHeight: 1.25, wordBreak: 'break-all' }}>
+      <div style={{ marginTop: 28, fontSize: 68, fontWeight: 800, lineHeight: 1.25, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
         {card.heading}
       </div>
       <div style={{ marginTop: 56, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly' }}>
         {card.rows.map((row, i) => (
           <div key={i}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
-              <span style={{ fontSize: 36, fontWeight: 700, wordBreak: 'break-all' }}>{row.label}</span>
+              <span style={{ fontSize: 36, fontWeight: 700, wordBreak: 'normal', overflowWrap: 'anywhere' }}>{row.label}</span>
               <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 700, color: theme.accent }}>{row.value}</span>
             </div>
             <div style={{ height: 28, background: theme.line }}>
@@ -434,7 +434,7 @@ function SummaryCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'su
   return (
     <>
       <Kicker theme={theme}>{card.kicker}</Kicker>
-      <div style={{ marginTop: 28, fontSize: 68, fontWeight: 800, lineHeight: 1.25, wordBreak: 'break-all' }}>
+      <div style={{ marginTop: 28, fontSize: 68, fontWeight: 800, lineHeight: 1.25, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
         {card.heading}
       </div>
       <div style={{ marginTop: 44, flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -444,9 +444,9 @@ function SummaryCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'su
               {String(i + 1).padStart(2, '0')}
             </span>
             <div>
-              <span style={{ fontSize: 36, fontWeight: 700, wordBreak: 'break-all' }}>{item.label}</span>
+              <span style={{ fontSize: 36, fontWeight: 700, wordBreak: 'normal', overflowWrap: 'anywhere' }}>{item.label}</span>
               {item.detail && (
-                <span style={{ fontSize: 30, color: theme.subtle, marginLeft: 18, wordBreak: 'break-all' }}>
+                <span style={{ fontSize: 30, color: theme.subtle, marginLeft: 18, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
                   {item.detail}
                 </span>
               )}
@@ -465,7 +465,7 @@ function SummaryCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'su
             fontWeight: 600,
             lineHeight: 1.4,
             padding: '32px 40px',
-            wordBreak: 'break-all',
+            wordBreak: 'normal', overflowWrap: 'anywhere',
           }}
         >
           {card.closing}

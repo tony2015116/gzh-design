@@ -31,6 +31,15 @@ export const Paragraph: React.FC<ParagraphProps> = ({ content, theme: _theme, la
   };
 
   return (
-    <p style={getStyle()} dangerouslySetInnerHTML={{ __html: content }} />
+    <p
+      style={{
+        ...getStyle(),
+        marginBottom: 'var(--paragraph-spacing)',
+        fontSize: 'var(--body-font-size)',
+        lineHeight: 'var(--body-line-height)',
+        fontFamily: 'var(--body-font-family)',
+      }}
+      dangerouslySetInnerHTML={{ __html: content }}
+    />
   );
 };

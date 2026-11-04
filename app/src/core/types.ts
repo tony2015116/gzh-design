@@ -1,6 +1,8 @@
 export type ComponentType = 
   | 'title' 
   | 'subtitle' 
+  | 'heading3'
+  | 'heading4'
   | 'paragraph' 
   | 'highlight' 
   | 'quote' 
@@ -10,6 +12,11 @@ export type ComponentType =
   | 'list' 
   | 'info_card' 
   | 'summary_card'
+  | 'scroll_card'
+  | 'long_image_card'
+  | 'cover_card'
+  | 'toc_card'
+  | 'author_card'
   | 'code_block'
   | 'table';
 

@@ -83,7 +83,7 @@ const displayTitle: CSSProperties = {
   fontWeight: 300,
   lineHeight: 1.32,
   letterSpacing: '0.06em',
-  wordBreak: 'break-all',
+  wordBreak: 'normal', overflowWrap: 'anywhere',
 };
 
 const pageHeading: CSSProperties = {
@@ -91,7 +91,7 @@ const pageHeading: CSSProperties = {
   fontWeight: 400,
   lineHeight: 1.3,
   letterSpacing: '0.04em',
-  wordBreak: 'break-all',
+  wordBreak: 'normal', overflowWrap: 'anywhere',
 };
 
 /** 幽灵序号：超大半透明数字 */
@@ -115,7 +115,7 @@ function CoverCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'cove
         <div style={displayTitle}>{card.title}</div>
         <div style={{ marginTop: 52, width: 72, height: 8, borderRadius: 4, background: theme.accent }} />
         {card.subtitle && (
-          <div style={{ marginTop: 44, fontSize: 36, fontWeight: 400, lineHeight: 1.55, color: theme.subtle, wordBreak: 'break-all' }}>
+          <div style={{ marginTop: 44, fontSize: 36, fontWeight: 400, lineHeight: 1.55, color: theme.subtle, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
             {card.subtitle}
           </div>
         )}
@@ -144,9 +144,9 @@ function ChecklistCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: '
           <div key={i} style={{ display: 'flex', gap: 32, alignItems: 'center', background: theme.soft, borderRadius: 20, padding: '30px 36px' }}>
             <span style={ghostNumber(theme)}>{String(i + 1).padStart(2, '0')}</span>
             <div>
-              <div style={{ fontSize: 40, fontWeight: 600, lineHeight: 1.3, wordBreak: 'break-all' }}>{item.label}</div>
+              <div style={{ fontSize: 40, fontWeight: 600, lineHeight: 1.3, wordBreak: 'normal', overflowWrap: 'anywhere' }}>{item.label}</div>
               {item.detail && (
-                <div style={{ marginTop: 6, fontSize: 29, lineHeight: 1.5, color: theme.subtle, wordBreak: 'break-all' }}>
+                <div style={{ marginTop: 6, fontSize: 29, lineHeight: 1.5, color: theme.subtle, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
                   {item.detail}
                 </div>
               )}
@@ -168,9 +168,9 @@ function StepsCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'step
           <div key={i} style={{ display: 'flex', gap: 32, alignItems: 'flex-start', padding: '18px 0' }}>
             <span style={ghostNumber(theme)}>{String(i + 1).padStart(2, '0')}</span>
             <div>
-              <div style={{ fontSize: 44, fontWeight: 600, lineHeight: 1.3, wordBreak: 'break-all' }}>{step.title}</div>
+              <div style={{ fontSize: 44, fontWeight: 600, lineHeight: 1.3, wordBreak: 'normal', overflowWrap: 'anywhere' }}>{step.title}</div>
               {step.desc && (
-                <div style={{ marginTop: 8, fontSize: 30, lineHeight: 1.5, color: theme.subtle, wordBreak: 'break-all' }}>
+                <div style={{ marginTop: 8, fontSize: 30, lineHeight: 1.5, color: theme.subtle, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
                   {step.desc}
                 </div>
               )}
@@ -203,7 +203,7 @@ function CompareCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'co
       </div>
       <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 22, opacity: good ? 1 : 0.6 }}>
         {data.points.map((p, i) => (
-          <div key={i} style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.5, wordBreak: 'break-all' }}>
+          <div key={i} style={{ fontSize: 32, fontWeight: 400, lineHeight: 1.5, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
             {p}
           </div>
         ))}
@@ -229,7 +229,7 @@ function QuoteCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'quot
       <Label theme={theme}>{card.kicker || '划重点'}</Label>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div style={{ fontSize: 120, fontWeight: 200, lineHeight: 0.8, color: theme.accent, marginBottom: 40 }}>&ldquo;</div>
-        <div style={{ fontSize: 68, fontWeight: 300, lineHeight: 1.5, letterSpacing: '0.04em', wordBreak: 'break-all' }}>
+        <div style={{ fontSize: 68, fontWeight: 300, lineHeight: 1.5, letterSpacing: '0.04em', wordBreak: 'normal', overflowWrap: 'anywhere' }}>
           {card.quote}
         </div>
         {card.source && (
@@ -249,7 +249,7 @@ function DataCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'data'
         {card.rows.map((row, i) => (
           <div key={i}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
-              <span style={{ fontSize: 34, fontWeight: 500, wordBreak: 'break-all' }}>{row.label}</span>
+              <span style={{ fontSize: 34, fontWeight: 500, wordBreak: 'normal', overflowWrap: 'anywhere' }}>{row.label}</span>
               <span style={{ fontSize: 34, fontWeight: 600, color: theme.accent }}>{row.value}</span>
             </div>
             <div style={{ height: 10, borderRadius: 5, background: theme.soft }}>
@@ -279,16 +279,16 @@ function SummaryCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'su
           <div key={i} style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
             <span style={ghostNumber(theme)}>{String(i + 1).padStart(2, '0')}</span>
             <div>
-              <span style={{ fontSize: 38, fontWeight: 600, wordBreak: 'break-all' }}>{item.label}</span>
+              <span style={{ fontSize: 38, fontWeight: 600, wordBreak: 'normal', overflowWrap: 'anywhere' }}>{item.label}</span>
               {item.detail && (
-                <span style={{ fontSize: 30, color: theme.subtle, marginLeft: 20, wordBreak: 'break-all' }}>{item.detail}</span>
+                <span style={{ fontSize: 30, color: theme.subtle, marginLeft: 20, wordBreak: 'normal', overflowWrap: 'anywhere' }}>{item.detail}</span>
               )}
             </div>
           </div>
         ))}
       </div>
       {card.closing && (
-        <div style={{ marginTop: 36, fontSize: 40, fontWeight: 400, lineHeight: 1.45, color: theme.accent, wordBreak: 'break-all' }}>
+        <div style={{ marginTop: 36, fontSize: 40, fontWeight: 400, lineHeight: 1.45, color: theme.accent, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
           {card.closing}
         </div>
       )}

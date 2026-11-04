@@ -11,6 +11,11 @@ import { getXhsTheme, XHS_CARD_HEIGHT, XHS_CARD_WIDTH, XHS_THEME_PACKS, XhsCard 
 import type { XhsCardSpec } from './XhsCard';
 import { getStickerTheme, XHS_STICKER_THEMES, XhsStickerCard } from './XhsStickerCard';
 import { getMinimalTheme, XHS_MINIMAL_THEMES, XhsMinimalCard } from './XhsMinimalCard';
+import { getWorkbenchTheme, XHS_WORKBENCH_THEMES, XhsWorkbenchCard } from './XhsWorkbenchCard';
+import { getPulseTheme, XHS_PULSE_THEMES, XhsPulseCard } from './XhsPulseCard';
+import { getPosterTheme, XHS_POSTER_THEMES, XhsPosterCard } from './XhsPosterCard';
+
+type XhsSystemId = 'editorial' | 'sticker' | 'minimal' | 'workbench' | 'pulse' | 'poster';
 
 interface ImageExportPanelProps {
   elementId: string;
@@ -137,9 +142,12 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
   const [isGeneratingCopy, setIsGeneratingCopy] = useState(false);
   const [appliedProposalIndex, setAppliedProposalIndex] = useState<number | null>(null);
   const [xhsDeck, setXhsDeck] = useState<XhsDeck | null>(null);
-  const [cardSystem, setCardSystem] = useState<'editorial' | 'sticker' | 'minimal'>('editorial');
+  const [cardSystem, setCardSystem] = useState<XhsSystemId>('editorial');
   const [stickerThemeId, setStickerThemeId] = useState(XHS_STICKER_THEMES[0].id);
   const [minimalThemeId, setMinimalThemeId] = useState(XHS_MINIMAL_THEMES[0].id);
+  const [workbenchThemeId, setWorkbenchThemeId] = useState(XHS_WORKBENCH_THEMES[0].id);
+  const [pulseThemeId, setPulseThemeId] = useState(XHS_PULSE_THEMES[0].id);
+  const [posterThemeId, setPosterThemeId] = useState(XHS_POSTER_THEMES[0].id);
   const [isGeneratingDeck, setIsGeneratingDeck] = useState(false);
   const [selectedCardIndex, setSelectedCardIndex] = useState(0);
   const [isDownloadingCards, setIsDownloadingCards] = useState(false);
@@ -154,18 +162,43 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
     generate();
   }, [activeMode, sliceRatio]);
 
-  // 渲染后测量每张卡片是否溢出（文字超出画布），给出警告而不是默默截断
+  // 渲染后测量每张卡片是否溢出（文字超出画布）。之前深度遍历会误报两类：
+  //   (1) 绝对定位装饰（胶带/页脚/LED）
+  //   (2) 带 letter-spacing 的 CJK 文本 —— 每字尾间距累加到 scrollWidth 但不算入
+  //       clientWidth，5-10 字就能虚增 20-40px，把每个 kicker 标签都标成溢出。
+  // 现在只报"高度纵向真正超" —— 横向由 CSS overflowWrap 兜住，几乎不会真溢出。
   useEffect(() => {
     if (!xhsDeck) return;
     const timer = setTimeout(() => {
       const overflow = new Set<number>();
+      const HEIGHT_TOL = 12;
+      const hasDirectText = (node: HTMLElement) => {
+        for (let n = 0; n < node.childNodes.length; n += 1) {
+          const child = node.childNodes[n];
+          if (child.nodeType === Node.TEXT_NODE && (child.textContent || '').trim().length > 2) return true;
+        }
+        return false;
+      };
       cardRefs.current.forEach((el, i) => {
-        if (el && el.scrollHeight > el.clientHeight + 4) overflow.add(i);
+        if (!el) return;
+        const nodes = el.querySelectorAll<HTMLElement>('*');
+        for (let n = 0; n < nodes.length; n += 1) {
+          const node = nodes[n];
+          if (node.tagName === 'SVG' || node.tagName === 'svg') continue;
+          const cs = window.getComputedStyle(node);
+          if (cs.position === 'absolute' || cs.position === 'fixed') continue;
+          if (!hasDirectText(node)) continue;
+          // 只信纵向：文字真的顶破容器高度才是溢出。
+          if (node.scrollHeight > node.clientHeight + HEIGHT_TOL) {
+            overflow.add(i);
+            break;
+          }
+        }
       });
       setOverflowCards(overflow);
-    }, 120);
+    }, 220);
     return () => clearTimeout(timer);
-  }, [xhsDeck, cardSystem, stickerThemeId, minimalThemeId]);
+  }, [xhsDeck, cardSystem, stickerThemeId, minimalThemeId, workbenchThemeId, pulseThemeId, posterThemeId]);
 
   const generate = async () => {
     setIsGenerating(true);
@@ -249,6 +282,13 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
       const deck = await generateXhsCards(markdown ?? '');
       setXhsDeck(deck);
       setSelectedCardIndex(0);
+      // AI 会先按文章调性挑一套视觉系统，UI 顺势切过去，用户仍可手动改
+      setCardSystem(deck.system);
+      if (deck.system === 'sticker') setStickerThemeId(deck.theme);
+      else if (deck.system === 'minimal') setMinimalThemeId(deck.theme);
+      else if (deck.system === 'workbench') setWorkbenchThemeId(deck.theme);
+      else if (deck.system === 'pulse') setPulseThemeId(deck.theme);
+      else if (deck.system === 'poster') setPosterThemeId(deck.theme);
     } catch (e: any) {
       setError(e.message || 'AI 图文生成失败');
     } finally {
@@ -265,12 +305,11 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
     if (!xhsDeck) return null;
     const page = index + 1;
     const total = xhsDeck.cards.length;
-    if (cardSystem === 'sticker') {
-      return <XhsStickerCard card={card} theme={getStickerTheme(stickerThemeId)} page={page} total={total} />;
-    }
-    if (cardSystem === 'minimal') {
-      return <XhsMinimalCard card={card} theme={getMinimalTheme(minimalThemeId)} page={page} total={total} />;
-    }
+    if (cardSystem === 'sticker') return <XhsStickerCard card={card} theme={getStickerTheme(stickerThemeId)} page={page} total={total} />;
+    if (cardSystem === 'minimal') return <XhsMinimalCard card={card} theme={getMinimalTheme(minimalThemeId)} page={page} total={total} />;
+    if (cardSystem === 'workbench') return <XhsWorkbenchCard card={card} theme={getWorkbenchTheme(workbenchThemeId)} page={page} total={total} />;
+    if (cardSystem === 'pulse') return <XhsPulseCard card={card} theme={getPulseTheme(pulseThemeId)} page={page} total={total} />;
+    if (cardSystem === 'poster') return <XhsPosterCard card={card} theme={getPosterTheme(posterThemeId)} page={page} total={total} />;
     return <XhsCard card={card} theme={getXhsTheme(xhsDeck.theme)} page={page} total={total} />;
   };
 
@@ -441,11 +480,14 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
                         { id: 'editorial', name: '杂志风' },
                         { id: 'sticker', name: '手账风' },
                         { id: 'minimal', name: '简约风' },
+                        { id: 'workbench', name: '工作台' },
+                        { id: 'pulse', name: '系统脉冲' },
+                        { id: 'poster', name: '海报' },
                       ] as const).map((sys) => (
                         <button
                           key={sys.id}
                           onClick={() => setCardSystem(sys.id)}
-                          className={`rounded-[14px] px-3 py-2.5 text-sm font-medium transition-all ${
+                          className={`rounded-[14px] px-2 py-2 text-xs font-medium transition-all ${
                             cardSystem === sys.id
                               ? 'bg-emerald-300 text-slate-950 shadow-[0_8px_24px_rgba(110,231,183,0.3)]'
                               : 'border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
@@ -462,17 +504,28 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
                       主题包
                     </label>
                     {(() => {
-                      const packs =
+                      // 每套视觉系统各自的主题列表；用最小共同接口 { id, name, bg, fg, accent } 展示预览
+                      type ThemePreview = { id: string; name: string; bg: string; fg: string; accent: string };
+                      const packs: ThemePreview[] =
                         cardSystem === 'sticker' ? XHS_STICKER_THEMES
                         : cardSystem === 'minimal' ? XHS_MINIMAL_THEMES
+                        : cardSystem === 'workbench' ? XHS_WORKBENCH_THEMES.map((t) => ({ id: t.id, name: t.name, bg: t.wood, fg: t.fg, accent: t.accent }))
+                        : cardSystem === 'pulse' ? XHS_PULSE_THEMES
+                        : cardSystem === 'poster' ? XHS_POSTER_THEMES
                         : XHS_THEME_PACKS;
                       const activeId =
                         cardSystem === 'sticker' ? stickerThemeId
                         : cardSystem === 'minimal' ? minimalThemeId
+                        : cardSystem === 'workbench' ? workbenchThemeId
+                        : cardSystem === 'pulse' ? pulseThemeId
+                        : cardSystem === 'poster' ? posterThemeId
                         : xhsDeck.theme;
                       const select = (id: string) => {
                         if (cardSystem === 'sticker') setStickerThemeId(id);
                         else if (cardSystem === 'minimal') setMinimalThemeId(id);
+                        else if (cardSystem === 'workbench') setWorkbenchThemeId(id);
+                        else if (cardSystem === 'pulse') setPulseThemeId(id);
+                        else if (cardSystem === 'poster') setPosterThemeId(id);
                         else setXhsDeck((d) => (d ? { ...d, theme: id } : d));
                       };
                       return (

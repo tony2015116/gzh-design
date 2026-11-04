@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { XHS_CARDS_PROMPT, XHS_LAYOUT_IDS, XHS_THEME_IDS } from '../src/lib/xhsCardsPrompt';
+import {
+  XHS_CARDS_PROMPT,
+  XHS_LAYOUT_IDS,
+  XHS_MINIMAL_THEME_IDS,
+  XHS_POSTER_THEME_IDS,
+  XHS_PULSE_THEME_IDS,
+  XHS_STICKER_THEME_IDS,
+  XHS_SYSTEM_IDS,
+  XHS_THEME_IDS,
+  XHS_WORKBENCH_THEME_IDS,
+} from '../src/lib/xhsCardsPrompt';
 
 // 图文拆条提示词与前端 app/src/components/ui/XhsCard.tsx 的版式/主题包保持同步，
 // 任何一侧增删版式或主题时，这里都应该先红。
@@ -19,20 +29,41 @@ describe('AI 图文拆条提示词', () => {
     ]);
   });
 
-  it('提示词包含全部版式与主题 ID', () => {
+  it('六套视觉系统 ID 齐全，各自主题数量正确', () => {
+    expect(XHS_SYSTEM_IDS).toEqual(['editorial', 'sticker', 'minimal', 'workbench', 'pulse', 'poster']);
+    expect(XHS_STICKER_THEME_IDS).toHaveLength(6);
+    expect(XHS_MINIMAL_THEME_IDS).toHaveLength(6);
+    expect(XHS_WORKBENCH_THEME_IDS).toHaveLength(3);
+    expect(XHS_PULSE_THEME_IDS).toHaveLength(4);
+    expect(XHS_POSTER_THEME_IDS).toHaveLength(6);
+  });
+
+  it('提示词包含全部版式与六套系统的主题 ID', () => {
     for (const id of XHS_LAYOUT_IDS) {
       expect(XHS_CARDS_PROMPT).toContain(`"layout":"${id}"`);
     }
-    for (const id of XHS_THEME_IDS) {
+    for (const id of [
+      ...XHS_THEME_IDS,
+      ...XHS_STICKER_THEME_IDS,
+      ...XHS_MINIMAL_THEME_IDS,
+      ...XHS_WORKBENCH_THEME_IDS,
+      ...XHS_PULSE_THEME_IDS,
+      ...XHS_POSTER_THEME_IDS,
+    ]) {
+      expect(XHS_CARDS_PROMPT).toContain(`"${id}"`);
+    }
+    for (const id of XHS_SYSTEM_IDS) {
       expect(XHS_CARDS_PROMPT).toContain(`"${id}"`);
     }
   });
 
-  it('提示词约束了 JSON 结构、页数与字数硬上限', () => {
+  it('提示词约束了 JSON 结构、系统选择与字数硬上限', () => {
     expect(XHS_CARDS_PROMPT).toContain('"cards"');
     expect(XHS_CARDS_PROMPT).toContain('"theme"');
+    expect(XHS_CARDS_PROMPT).toContain('"system"');
     expect(XHS_CARDS_PROMPT).toContain('第一张必须是 cover');
-    expect(XHS_CARDS_PROMPT).toContain('9 张以内');
+    expect(XHS_CARDS_PROMPT).toContain('每张卡片只承担一个主阅读任务');
+    expect(XHS_CARDS_PROMPT).toContain('至少覆盖 3 种不同的 layout');
     expect(XHS_CARDS_PROMPT).toContain('禁止编造数据');
     expect(XHS_CARDS_PROMPT).toContain('不要输出任何解释或代码围栏');
   });

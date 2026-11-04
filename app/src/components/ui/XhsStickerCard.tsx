@@ -205,7 +205,7 @@ function CoverCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'cove
     <>
       <Tag theme={theme}>{card.kicker || '笔记'}</Tag>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <div style={{ fontSize: 108, fontWeight: 900, lineHeight: 1.3, wordBreak: 'break-all' }}>
+        <div style={{ fontSize: 108, fontWeight: 900, lineHeight: 1.3, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
           <span style={marker(theme)}>{card.title}</span>
         </div>
         <div
@@ -228,7 +228,7 @@ function CoverCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'cove
               fontSize: 38,
               fontWeight: 700,
               lineHeight: 1.45,
-              wordBreak: 'break-all',
+              wordBreak: 'normal', overflowWrap: 'anywhere',
             }}
           >
             <Tape theme={theme} />
@@ -291,9 +291,9 @@ function RowCard({
         {index + 1}
       </span>
       <div>
-        <div style={{ fontSize: 42, fontWeight: 800, lineHeight: 1.3, wordBreak: 'break-all' }}>{title}</div>
+        <div style={{ fontSize: 42, fontWeight: 800, lineHeight: 1.3, wordBreak: 'normal', overflowWrap: 'anywhere' }}>{title}</div>
         {detail && (
-          <div style={{ marginTop: 8, fontSize: 30, lineHeight: 1.45, color: theme.subtle, wordBreak: 'break-all' }}>
+          <div style={{ marginTop: 8, fontSize: 30, lineHeight: 1.45, color: theme.subtle, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
             {detail}
           </div>
         )}
@@ -306,7 +306,7 @@ function ChecklistCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: '
   return (
     <>
       <Tag theme={theme}>{card.kicker || '清单'}</Tag>
-      <div style={{ marginTop: 34, fontSize: 68, fontWeight: 900, lineHeight: 1.28, wordBreak: 'break-all' }}>
+      <div style={{ marginTop: 34, fontSize: 68, fontWeight: 900, lineHeight: 1.28, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
         {card.heading}
       </div>
       <div style={{ marginTop: 24, width: 110, height: 12, borderRadius: 6, background: theme.accent }} />
@@ -323,7 +323,7 @@ function StepsCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'step
   return (
     <>
       <Tag theme={theme}>{card.kicker || '步骤'}</Tag>
-      <div style={{ marginTop: 34, fontSize: 68, fontWeight: 900, lineHeight: 1.28, wordBreak: 'break-all' }}>
+      <div style={{ marginTop: 34, fontSize: 68, fontWeight: 900, lineHeight: 1.28, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
         {card.heading}
       </div>
       <div style={{ marginTop: 24, width: 110, height: 12, borderRadius: 6, background: theme.accent }} />
@@ -343,9 +343,9 @@ function StepsCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'step
               {String(i + 1).padStart(2, '0')}
             </span>
             <div>
-              <div style={{ fontSize: 44, fontWeight: 800, lineHeight: 1.3, wordBreak: 'break-all' }}>{step.title}</div>
+              <div style={{ fontSize: 44, fontWeight: 800, lineHeight: 1.3, wordBreak: 'normal', overflowWrap: 'anywhere' }}>{step.title}</div>
               {step.desc && (
-                <div style={{ marginTop: 8, fontSize: 30, lineHeight: 1.45, color: theme.subtle, wordBreak: 'break-all' }}>
+                <div style={{ marginTop: 8, fontSize: 30, lineHeight: 1.45, color: theme.subtle, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
                   {step.desc}
                 </div>
               )}
@@ -387,7 +387,7 @@ function CompareCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'co
       </span>
       <div style={{ marginTop: 30, display: 'flex', flexDirection: 'column', gap: 20 }}>
         {data.points.map((p, i) => (
-          <div key={i} style={{ display: 'flex', gap: 14, fontSize: 33, fontWeight: 600, lineHeight: 1.45, wordBreak: 'break-all' }}>
+          <div key={i} style={{ display: 'flex', gap: 14, fontSize: 33, fontWeight: 600, lineHeight: 1.45, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
             <span style={{ color: good ? theme.accent : theme.subtle, fontWeight: 900 }}>{good ? '✓' : '✗'}</span>
             <span>{p}</span>
           </div>
@@ -399,7 +399,7 @@ function CompareCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'co
   return (
     <>
       <Tag theme={theme}>{card.kicker || '对比'}</Tag>
-      <div style={{ marginTop: 34, fontSize: 68, fontWeight: 900, lineHeight: 1.28, wordBreak: 'break-all' }}>
+      <div style={{ marginTop: 34, fontSize: 68, fontWeight: 900, lineHeight: 1.28, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
         {card.heading}
       </div>
       <div style={{ marginTop: 24, width: 110, height: 12, borderRadius: 6, background: theme.accent }} />
@@ -418,7 +418,7 @@ function QuoteCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'quot
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div style={{ ...paperCard(theme, -0.6), padding: '80px 56px 56px' }}>
           <Tape theme={theme} rotate={2} />
-          <div style={{ fontSize: 62, fontWeight: 900, lineHeight: 1.5, wordBreak: 'break-all' }}>
+          <div style={{ fontSize: 62, fontWeight: 900, lineHeight: 1.5, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
             <span style={marker(theme)}>{card.quote}</span>
           </div>
           {card.source && (
@@ -434,7 +434,7 @@ function DataCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'data'
   return (
     <>
       <Tag theme={theme}>{card.kicker || '数据'}</Tag>
-      <div style={{ marginTop: 34, fontSize: 68, fontWeight: 900, lineHeight: 1.28, wordBreak: 'break-all' }}>
+      <div style={{ marginTop: 34, fontSize: 68, fontWeight: 900, lineHeight: 1.28, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
         {card.heading}
       </div>
       <div style={{ marginTop: 24, width: 110, height: 12, borderRadius: 6, background: theme.accent }} />
@@ -453,7 +453,7 @@ function DataCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'data'
         {card.rows.map((row, i) => (
           <div key={i}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
-              <span style={{ fontSize: 36, fontWeight: 800, wordBreak: 'break-all' }}>{row.label}</span>
+              <span style={{ fontSize: 36, fontWeight: 800, wordBreak: 'normal', overflowWrap: 'anywhere' }}>{row.label}</span>
               <span style={{ fontSize: 34, fontWeight: 900, color: theme.accent }}>{row.value}</span>
             </div>
             <div style={{ height: 26, borderRadius: 999, background: `${theme.accent}22` }}>
@@ -477,7 +477,7 @@ function SummaryCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'su
   return (
     <>
       <Tag theme={theme}>{card.kicker || '总结'}</Tag>
-      <div style={{ marginTop: 34, fontSize: 68, fontWeight: 900, lineHeight: 1.28, wordBreak: 'break-all' }}>
+      <div style={{ marginTop: 34, fontSize: 68, fontWeight: 900, lineHeight: 1.28, wordBreak: 'normal', overflowWrap: 'anywhere' }}>
         {card.heading}
       </div>
       <div style={{ marginTop: 24, width: 110, height: 12, borderRadius: 6, background: theme.accent }} />
@@ -498,7 +498,7 @@ function SummaryCard({ card, theme }: { card: Extract<XhsCardSpec, { layout: 'su
             fontWeight: 900,
             lineHeight: 1.4,
             textAlign: 'center',
-            wordBreak: 'break-all',
+            wordBreak: 'normal', overflowWrap: 'anywhere',
             transform: 'rotate(-0.5deg)',
           }}
         >

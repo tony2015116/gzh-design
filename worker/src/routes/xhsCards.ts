@@ -4,6 +4,8 @@ import { authenticateUser } from '../lib/auth';
 import { getAiFormatAuthMode } from '../lib/permissions';
 import { getFormatPreviewChars, logFormatEvent, truncateForLog } from '../lib/logging';
 import { XHS_CARDS_PROMPT } from '../lib/xhsCardsPrompt';
+import { checkInputLength, consumeDailyQuota, refundDailyQuota, resolveQuotaSubject, resolveUpstreamConfig } from '../lib/aiGuard';
+import { callUpstreamChat, toChatCompletionResponse, UpstreamChatError } from '../lib/upstreamChat';
 
 // 鉴权规则与 /api/format（AI 排版）一致：online 模式下默认需要登录或有效 Secret。
 export async function handleXhsCards(
@@ -67,11 +69,26 @@ export async function handleXhsCards(
     return jsonResponse({ error: '缺少 markdown 字段' }, 400, cors);
   }
 
-  const baseUrl = body.baseUrl || env.OPENAI_API_BASE || 'https://api.openai.com/v1';
-  const modelName = body.model || env.OPENAI_MODEL || 'gpt-4o';
-  let endpoint = baseUrl;
-  if (!endpoint.endsWith('chat/completions')) {
-    endpoint = endpoint.endsWith('/') ? `${endpoint}chat/completions` : `${endpoint}/chat/completions`;
+  const inputError = checkInputLength(env, markdown);
+  if (inputError) {
+    logFormatEvent(env, traceId, 'request.too_large', { markdownLength: markdown.length, feature: 'xhs-cards' });
+    return jsonResponse({ error: inputError }, 413, cors);
+  }
+
+  // 客户端传来的 baseUrl / model 一律忽略，只用服务端配置（防止 OPENAI_API_KEY 被转发到第三方地址）
+  const { endpoint, model: modelName } = resolveUpstreamConfig(env);
+
+  const usedSecret = !authenticatedUser && Boolean(env.UPLOAD_SECRET) && bearerToken === env.UPLOAD_SECRET;
+  const quotaSubject = resolveQuotaSubject(request, authenticatedUser, usedSecret);
+  try {
+    const quota = await consumeDailyQuota(env, quotaSubject);
+    if (!quota.ok) {
+      logFormatEvent(env, traceId, 'quota.exceeded', { subject: quotaSubject?.key || '', limit: quota.limit, feature: 'xhs-cards' });
+      return jsonResponse({ error: `今日 AI 调用次数已用完（每日 ${quota.limit} 次），请明天再试` }, 429, cors);
+    }
+  } catch (err: any) {
+    logFormatEvent(env, traceId, 'quota.error', { message: err?.message || 'unknown', feature: 'xhs-cards' });
+    return jsonResponse({ error: '服务端额度表未初始化，请执行 schema.sql 中的 ai_usage 建表语句' }, 500, cors);
   }
 
   logFormatEvent(env, traceId, 'request.parsed', {
@@ -85,45 +102,37 @@ export async function handleXhsCards(
 
   try {
     const upstreamStartedAt = Date.now();
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: modelName,
-        messages: [
-          { role: 'system', content: XHS_CARDS_PROMPT },
-          { role: 'user', content: markdown },
-        ],
-        temperature: 0.7,
-      }),
+    // 流式请求：避免长文生成时中转的 Cloudflare 边缘 100 秒无响应超时（524）
+    const content = await callUpstreamChat({
+      endpoint,
+      apiKey: env.OPENAI_API_KEY,
+      model: modelName,
+      systemPrompt: XHS_CARDS_PROMPT,
+      userContent: markdown,
+      temperature: 0.7,
     });
 
     const upstreamDurationMs = Date.now() - upstreamStartedAt;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      logFormatEvent(env, traceId, 'upstream.request.failed', {
-        status: response.status,
-        durationMs: upstreamDurationMs,
-        errorPreview: truncateForLog(errorText, previewChars),
-        feature: 'xhs-cards',
-      });
-      return jsonResponse({ error: '上游 AI 请求失败', details: errorText }, response.status, cors);
-    }
-
-    const data: any = await response.json();
-
     logFormatEvent(env, traceId, 'request.completed', {
       totalDurationMs: Date.now() - startedAt,
-      outputChars: typeof data?.choices?.[0]?.message?.content === 'string' ? data.choices[0].message.content.length : 0,
+      upstreamDurationMs,
+      streamed: true,
+      outputChars: content.length,
       feature: 'xhs-cards',
     });
 
-    return jsonResponse(data, 200, cors);
+    return jsonResponse(toChatCompletionResponse(content), 200, cors);
   } catch (err: any) {
+    await refundDailyQuota(env, quotaSubject);
+    if (err instanceof UpstreamChatError) {
+      logFormatEvent(env, traceId, 'upstream.request.failed', {
+        status: err.status,
+        errorPreview: truncateForLog(err.details, previewChars),
+        feature: 'xhs-cards',
+      });
+      return jsonResponse({ error: '上游 AI 请求失败', details: err.details }, err.status, cors);
+    }
     logFormatEvent(env, traceId, 'worker.exception', {
       totalDurationMs: Date.now() - startedAt,
       message: err?.message || 'unknown',

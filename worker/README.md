@@ -17,6 +17,7 @@ Cloudflare Worker backend for auth, presets, image upload, AI typesetting, and s
 
 - `UPLOAD_SECRET`: legacy secret-based auth for upload or mixed AI proxy mode
 - `GEMINI_API_KEY`: enables real image generation for `http_image` illustration items
+- `FEISHU_APP_ID` / `FEISHU_APP_SECRET`: 部署者的飞书自建应用凭证，作为 `/api/feishu/*` 的兜底（适合同企业内共用）。普通用户通常在前端侧边栏保存自己的应用凭证（存 `feishu_apps` 表），此时无需配置这两个 secret
 
 ## Optional vars
 

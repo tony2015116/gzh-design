@@ -155,4 +155,7 @@ export default defineConfig(({ command }) => ({
   // dev 时启用会额外拉起 miniflare 并联网拉取 Request.cf 占位数据，
   // 网络不通时会在启动阶段刷 TimeoutError（非致命但很吵）。
   plugins: [react(), tailwindcss(), ossAiLogPlugin(), aiProxyPlugin(), ...(command === 'build' ? [cloudflare()] : [])],
+  optimizeDeps: {
+    exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
+  },
 }))

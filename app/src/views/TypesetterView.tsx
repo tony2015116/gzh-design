@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BookOpen,
+  Cloud,
   Copy,
   FileText,
   ImageDown,
@@ -11,14 +13,30 @@ import {
   MonitorPlay,
   Settings,
   Share2,
+  Undo2,
   User as UserIcon,
   Wand2,
 } from 'lucide-react';
 
 import { getAITypesetMarkdown } from '../ai/formatter';
+import { analyzeAiTypesetOutput } from '../ai/aiOutputCheck';
+import type { AiOutputAnalysis } from '../ai/aiOutputCheck';
+import { AiResultReviewModal } from '../components/ui/AiResultReviewModal';
+import { FormatPreferenceModal } from '../components/ui/FormatPreferenceModal';
+import { normalizeFormatPreferences, sanitizeFormatCustomNote, type FormatPreferences } from '../ai/formatPreferences';
+import { parseFormatRequest } from '../ai/formatRequestParser';
+import {
+  loadDraft,
+  loadUndoSnapshot,
+  saveDraft,
+  saveUndoSnapshot,
+  type UndoSnapshot,
+} from '../services/draftStorage';
 import { Preview } from '../components/preview/Preview';
+import { buildWechatCopyRoot, copyWechatHtmlBySelection } from '../core/wechatExport';
 import { CheatsheetModal } from '../components/ui/CheatsheetModal';
 import { DevIdentitySwitcher } from '../components/ui/DevIdentitySwitcher';
+import { FeishuSidebar } from '../components/ui/FeishuSidebar';
 import { HeaderMenu } from '../components/ui/HeaderMenu';
 import { InputPromptModal } from '../components/ui/InputPromptModal';
 import { IllustrationJobPanel } from '../components/ui/IllustrationJobPanel';
@@ -26,9 +44,38 @@ import { IllustrationPlanModal } from '../components/ui/IllustrationPlanModal';
 import { PlatformExportPanel } from '../components/ui/PlatformExportPanel';
 import { ImageExportPanel } from '../components/ui/ImageExportPanel';
 import { ToastStack, type ToastItem, type ToastTone } from '../components/ui/ToastStack';
+import { TypographyControl } from '../components/ui/TypographyControl';
+import { ComponentStyleControl } from '../components/ui/ComponentStyleControl';
+import { StyleSchemeControl } from '../components/ui/StyleSchemeControl';
 import { Editor } from '../components/editor/Editor';
 import { DEFAULT_IMAGE_STYLE, DEFAULT_LAYOUT_STYLE, IMAGE_STYLES, LAYOUT_STYLES } from '../core/style';
 import type { ImageStyle, LayoutStyle } from '../core/style';
+import { DEFAULT_EMPHASIS_CONFIG, normalizeEmphasisConfig } from '../core/emphasis';
+import type { EmphasisConfig } from '../core/emphasis';
+import {
+  DEFAULT_TYPOGRAPHY_CONFIG,
+  createTypographyConfigForLayout,
+  normalizeTypographyConfig,
+} from '../core/typography';
+import type { TypographyConfig } from '../core/typography';
+import {
+  DEFAULT_COMPONENT_STYLE_CONFIG,
+  normalizeComponentStyleConfig,
+} from '../core/componentStyle';
+import type { ComponentStyleConfig } from '../core/componentStyle';
+import {
+  STYLE_SCHEMES,
+  createCustomStyleScheme,
+  duplicateAsCustomStyleScheme,
+  findActiveStyleScheme,
+  loadCustomStyleSchemes,
+  parseImportedStyleSchemes,
+  saveCustomStyleSchemes,
+  serializeCustomStyleSchemes,
+  styleSchemeMatchesSelection,
+  updateCustomStyleScheme,
+} from '../core/styleScheme';
+import type { StyleScheme } from '../core/styleScheme';
 import { DEFAULT_THEME, THEMES } from '../core/theme';
 import type { Theme } from '../core/theme';
 import {
@@ -72,41 +119,91 @@ import {
   type XThreadExport,
 } from '../services/xExportService';
 
-const defaultMarkdown = `# 01 | 智能排版演示 | /// DEMO
+const defaultMarkdown = `# 01 | 完整排版演示 | /// MARKDOWN GUIDE
 
-在左侧输入 Markdown，右侧会实时渲染成适配公众号宽度的预览。
+这份演示覆盖当前支持的常用 Markdown 语法和公众号高级组件。你可以直接修改左侧内容，右侧会实时呈现效果。
 
-## STEP01 | 为什么需要自动配图
+## STEP01 | 标题层级
 
-很多知识型文章只有文字，没有必要的示意图、对比图和场景图，读者会更容易疲劳。尤其是教程、方法论、流程说明和数据分析文章，适当插图会显著提升可读性。
+### 小节标签 | 三级标题支持可选标签
 
-> 智能配图不是盲目加图，而是先分析哪些段落真的值得插图，再由用户确认。
+#### 四级标题适合段落内分层
+
+##### 五级标题沿用轻量小标题样式
+
+###### 六级标题适合细节备注
+
+## STEP02 | 行内文字效果
+
+普通正文中可以使用 **重点加粗**、*轻量斜体*、~~删除内容~~、\`行内代码\`，也可以插入[文字链接](https://mp.weixin.qq.com)。
+
+连续书写的第一行会保留换行，
+第二行仍然属于同一个段落。
+
+## STEP03 | 列表、引用与分割线
+
+无序列表适合并列信息：
+
+- 主题、版式和图片样式可以自由组合
+- 加粗内容支持多种强调效果
+- 个人方案支持保存和导入导出
+
+有序列表适合步骤说明：
+
+1. 输入或导入 Markdown 内容
+2. 选择风格方案并微调排版
+3. 复制结果到公众号编辑器
+
+> 好的排版会帮助读者理解内容层级，也会让重点信息更容易被看到。
 
 ---
 
-## STEP02 | 自动配图的两种引擎
+## STEP04 | 信息卡片与总结卡片
 
-系统规划了两类配图方式：
+<InfoCard title="关键提示">
+信息卡片适合展示提醒、背景信息和单段重点，内部支持 **加粗**、*斜体* 与 \`行内代码\`。
+</InfoCard>
 
-- HTTP 生图：适合主题图、场景图、封面图
-- HTML 信息图：适合流程图、对比图、框架图、时间线
+<SummaryCard title="本节总结">
+总结卡片适合放在章节结尾，也可以同时包含说明和列表。
+- 标题负责建立层级
+- 强调负责突出关键内容
+- 卡片负责收纳结构化信息
+</SummaryCard>
 
-## STEP03 | 当前阶段
+<ScrollCard title="长文滑动容器" height="180" hint="滑动查看">
+长文容器适合放置接口返回、日志、代码、数据说明和资料摘录。
+预览时会限制容器高度，读者可以在卡片内部滑动查看更多内容。
+复制到公众号时默认保留内部滚动；如果需要复制后展开全文，可以加入 \`copy="expand"\`。
+</ScrollCard>
 
-当前流程已经支持“建议 -> 确认 -> 后台生成 -> 手动应用到正文”。
+## STEP05 | 表格与代码块
 
-| 能力 | 当前状态 | 权限 |
-| :--- | :--- | :--- |
-| AI 排版 | 已可用 | 登录用户 |
-| 智能配图 | 已支持建议与异步生成 | VIP 用户 |
+| 能力 | 当前状态 | 适用场景 |
+| :--- | :---: | ---: |
+| 标准 Markdown | 已支持 | 日常写作 |
+| 高级排版组件 | 已支持 | 总结与提示 |
+| 风格方案 | 已支持 | 快速切换整套视觉 |
 
 \`\`\`javascript
-function greet() {
-  console.log("Hello WeChat");
-  return true;
+function createArticle(title, theme = 'jade') {
+  return { title, theme, ready: true };
 }
 \`\`\`
+
+## STEP06 | 单图与横排图组
+
+单独一行插入一张图片：
+
+![玉石绿抽象插图](/syntax-demo-jade.svg)
+
+同一行连续插入多张图片，会自动组成横排图组：
+
+![蓝色图组示例](/syntax-demo-blue.svg) ![暖色图组示例](/syntax-demo-warm.svg)
 `;
+
+const FORMAT_PREFERENCES_STORAGE_KEY = 'ai_format_preferences';
+const FORMAT_CUSTOM_NOTE_STORAGE_KEY = 'ai_format_custom_note';
 
 function TypesetterView() {
   const isOnlineMode = import.meta.env.VITE_APP_MODE === 'online';
@@ -114,8 +211,28 @@ function TypesetterView() {
   const showDevIdentity = shouldShowDevIdentitySwitcher();
   const navigate = useNavigate();
 
-  const [markdown, setMarkdown] = useState(defaultMarkdown);
+  const [markdown, setMarkdown] = useState(() => loadDraft() ?? defaultMarkdown);
+  const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(loadUndoSnapshot);
+  const [pendingAiResult, setPendingAiResult] = useState<{
+    original: string;
+    analysis: AiOutputAnalysis;
+  } | null>(null);
   const [isTypesetting, setIsTypesetting] = useState(false);
+  const [showFormatPreferences, setShowFormatPreferences] = useState(false);
+  const [formatPreferences, setFormatPreferences] = useState<FormatPreferences>(() => {
+    try {
+      return normalizeFormatPreferences(JSON.parse(localStorage.getItem(FORMAT_PREFERENCES_STORAGE_KEY) || 'null'));
+    } catch {
+      return normalizeFormatPreferences(null);
+    }
+  });
+  const [formatCustomNote, setFormatCustomNote] = useState(() => {
+    try {
+      return sanitizeFormatCustomNote(localStorage.getItem(FORMAT_CUSTOM_NOTE_STORAGE_KEY));
+    } catch {
+      return '';
+    }
+  });
   const [isPlanningIllustration, setIsPlanningIllustration] = useState(false);
   const [isApplyingIllustration, setIsApplyingIllustration] = useState(false);
   const [isApplyingIllustrationResult, setIsApplyingIllustrationResult] = useState(false);
@@ -127,6 +244,11 @@ function TypesetterView() {
   const [activeTheme, setActiveTheme] = useState<Theme>(DEFAULT_THEME);
   const [activeLayoutStyle, setActiveLayoutStyle] = useState<LayoutStyle>(DEFAULT_LAYOUT_STYLE);
   const [activeImageStyle, setActiveImageStyle] = useState<ImageStyle>(DEFAULT_IMAGE_STYLE);
+  const [activeEmphasis, setActiveEmphasis] = useState<EmphasisConfig>(DEFAULT_EMPHASIS_CONFIG);
+  const [activeTypography, setActiveTypography] = useState<TypographyConfig>(DEFAULT_TYPOGRAPHY_CONFIG);
+  const [activeComponentStyle, setActiveComponentStyle] = useState<ComponentStyleConfig>(DEFAULT_COMPONENT_STYLE_CONFIG);
+  const [customStyleSchemes, setCustomStyleSchemes] = useState<StyleScheme[]>(loadCustomStyleSchemes);
+  const [editingSchemeId, setEditingSchemeId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<'ai' | 'cdn'>('ai');
 
   const [uploadMode, setUploadMode] = useState<UploadMode>(loadUploadMode());
@@ -153,6 +275,7 @@ function TypesetterView() {
   const [xThreadExport, setXThreadExport] = useState<XThreadExport | null>(null);
   const [xArticleExport, setXArticleExport] = useState<XArticleExport | null>(null);
   const [showImageExportPanel, setShowImageExportPanel] = useState(false);
+  const [showFeishuSidebar, setShowFeishuSidebar] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -160,6 +283,30 @@ function TypesetterView() {
 
   const canUseCloudPresets = isRealAuth && Boolean(authUser);
   const canChangePassword = isRealAuth && Boolean(authUser);
+  const currentStyleSelection = {
+    themeId: activeTheme.id,
+    layoutId: activeLayoutStyle.id,
+    imageStyleId: activeImageStyle.id,
+    emphasis: activeEmphasis,
+    typography: activeTypography,
+    componentStyle: activeComponentStyle,
+  };
+  const activeStyleScheme = findActiveStyleScheme(
+    currentStyleSelection,
+    [...customStyleSchemes, ...STYLE_SCHEMES],
+  );
+  const editingScheme = editingSchemeId
+    ? customStyleSchemes.find((scheme) => scheme.id === editingSchemeId)
+    : undefined;
+  const editingDirty = Boolean(
+    editingScheme && !styleSchemeMatchesSelection(editingScheme, currentStyleSelection),
+  );
+  const currentSchemePreview = {
+    paper: activeLayoutStyle.id === 'dark' ? '#0F172A' : '#FFFFFF',
+    ink: activeLayoutStyle.id === 'dark' ? '#E2E8F0' : '#1F2937',
+    accent: activeTheme.primary,
+    soft: activeEmphasis.color,
+  };
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
@@ -245,6 +392,90 @@ function TypesetterView() {
     }, 3600);
   };
 
+  // 草稿自动保存：停止输入 800ms 后写入本地；存储写满时只提醒一次
+  const draftSaveFailedRef = useRef(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const ok = saveDraft(markdown);
+      if (!ok && !draftSaveFailedRef.current) {
+        draftSaveFailedRef.current = true;
+        pushToast('error', '草稿自动保存失败', '浏览器本地存储已满（base64 图片很占空间），建议改用图床上传图片。');
+      } else if (ok) {
+        draftSaveFailedRef.current = false;
+      }
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [markdown]);
+
+  /** 整篇替换正文前先留一份快照，之后可以从「AI 工具」菜单撤销 */
+  const replaceMarkdownWithUndo = (nextMarkdown: string, label: string) => {
+    if (nextMarkdown === markdown) return;
+    const snapshot = { label, markdown, savedAt: Date.now() };
+    setUndoSnapshot(snapshot);
+    saveUndoSnapshot(snapshot);
+    setMarkdown(nextMarkdown);
+  };
+
+  const handleUndoReplace = () => {
+    if (!undoSnapshot) return;
+    // 撤销本身也可以再撤销回来
+    const reverse = { label: `撤销「${undoSnapshot.label}」`, markdown, savedAt: Date.now() };
+    setMarkdown(undoSnapshot.markdown);
+    setUndoSnapshot(reverse);
+    saveUndoSnapshot(reverse);
+    pushToast('success', '已恢复', `已回到「${undoSnapshot.label}」之前的内容。`);
+  };
+
+  const handleExternalImport = (
+    title: string,
+    importedMarkdown: string,
+    sourceKind: 'feishu' | 'markdown' | 'plaintext' = 'feishu',
+  ) => {
+    if (!markdown.trim()) {
+      setMarkdown(importedMarkdown);
+    } else if (window.confirm('确定导入并覆盖当前编辑器内容吗？点“取消”则追加到末尾。')) {
+      replaceMarkdownWithUndo(importedMarkdown, '导入覆盖');
+    } else {
+      setMarkdown(markdown + '\n\n' + importedMarkdown);
+    }
+    setShowFeishuSidebar(false);
+    if (sourceKind === 'feishu') {
+      pushToast('success', '飞书文档已导入', title);
+    } else if (sourceKind === 'markdown') {
+      pushToast('success', 'Markdown 文件已导入', title);
+    } else {
+      pushToast(
+        'info',
+        '纯文本已导入,建议先用 AI 排版',
+        `${title} —— 无标题层级,右侧「AI 排版」可自动补 kicker / 加粗 / 分层`,
+      );
+    }
+  };
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const handleLocalFilePick = (ev: ChangeEvent<HTMLInputElement>) => {
+    const file = ev.target.files?.[0];
+    ev.target.value = ''; // 允许连续选同一个文件
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      pushToast('error', '文件过大', '仅支持 2MB 以内的 .md / .txt 文件');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === 'string' ? reader.result : '';
+      const nameNoExt = file.name.replace(/\.[^.]+$/, '');
+      const ext = (file.name.match(/\.([^.]+)$/)?.[1] || '').toLowerCase();
+      const kind: 'markdown' | 'plaintext' =
+        ext === 'md' || ext === 'markdown' ? 'markdown' : 'plaintext';
+      handleExternalImport(nameNoExt, text, kind);
+    };
+    reader.onerror = () => {
+      pushToast('error', '读取失败', '文件无法解析为文本,请确认编码为 UTF-8');
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
   const handleSavePreset = () => {
     if (!isRealAuth) {
       pushToast('info', '当前模式不支持', 'OSS 调试模式下不启用云端预设保存。');
@@ -267,7 +498,17 @@ function TypesetterView() {
 
     setIsSavingPreset(true);
     try {
-      await savePreset(name, activeTheme, activeLayoutStyle, activeImageStyle);
+      await savePreset(
+        name,
+        {
+          ...activeTheme,
+          emphasisConfig: activeEmphasis,
+          typographyConfig: activeTypography,
+          componentStyleConfig: activeComponentStyle,
+        },
+        activeLayoutStyle,
+        activeImageStyle,
+      );
       const nextPresets = await fetchPresets();
       setPresets(nextPresets);
       setShowPresetNameModal(false);
@@ -337,9 +578,21 @@ function TypesetterView() {
     const element = document.getElementById('wechat-article-preview');
     if (!element) return;
 
+    const { root: copyRoot, issues } = buildWechatCopyRoot(element);
+    const errors = issues.filter((issue) => issue.level === 'error');
+    if (issues.length > 0) console.warn('[公众号兼容检查]', issues);
+    if (copyWechatHtmlBySelection(copyRoot)) {
+      if (errors.length > 0) {
+        pushToast('info', '已复制，但有兼容风险', errors.map((issue) => issue.message).join('；'));
+      } else {
+        pushToast('success', '复制成功', '公众号富文本已复制到剪贴板。');
+      }
+      return;
+    }
+
     try {
-      let htmlContent = element.innerHTML || '';
-      const textContent = element.innerText;
+      let htmlContent = copyRoot.innerHTML || '';
+      const textContent = copyRoot.innerText;
 
       htmlContent = htmlContent.replace(/\n/g, '').replace(/\r/g, '');
 
@@ -352,7 +605,7 @@ function TypesetterView() {
       pushToast('success', '复制成功', '公众号兼容 HTML 已复制到剪贴板。');
     } catch {
       try {
-        await navigator.clipboard.writeText(element.outerHTML);
+        await navigator.clipboard.writeText(copyRoot.outerHTML);
         pushToast('success', '复制成功', '公众号兼容 HTML 已复制到剪贴板。');
       } catch {
         pushToast('error', '复制失败', '请重试，或检查浏览器剪贴板权限。');
@@ -432,17 +685,42 @@ function TypesetterView() {
       return;
     }
 
-    setIsTypesetting(true);
+    // 先选排版偏好，确认后再发请求
+    setShowFormatPreferences(true);
+  };
+
+  const runAITypeset = async () => {
+    setShowFormatPreferences(false);
+    // 没点「整理成选项」也照样整理一遍：能识别的并入选项，其余作为补充要求
+    const parsed = parseFormatRequest(formatCustomNote);
+    const preferences = { ...formatPreferences, ...parsed.preferences };
+    const customNote = sanitizeFormatCustomNote(parsed.rest);
+    setFormatPreferences(preferences);
+    setFormatCustomNote(customNote);
     try {
-      const nextMarkdown = await getAITypesetMarkdown(apiKey, markdown, apiBaseUrl, apiModel);
-      setMarkdown(nextMarkdown);
-      pushToast('success', 'AI 排版完成', '文章内容已按当前主题和版式完成优化。');
+      localStorage.setItem(FORMAT_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
+      localStorage.setItem(FORMAT_CUSTOM_NOTE_STORAGE_KEY, customNote);
+    } catch {}
+
+    setIsTypesetting(true);
+    const original = markdown;
+    try {
+      const rawOutput = await getAITypesetMarkdown(apiKey, original, apiBaseUrl, apiModel, preferences, customNote);
+      // 结果不直接落地：先给用户看对比和截断检查，确认后再替换
+      setPendingAiResult({ original, analysis: analyzeAiTypesetOutput(original, rawOutput) });
     } catch (error: any) {
       console.error('AI 排版失败:', error);
       pushToast('error', 'AI 排版失败', error.message || '请稍后重试。');
     } finally {
       setIsTypesetting(false);
     }
+  };
+
+  const handleAcceptAiResult = () => {
+    if (!pendingAiResult) return;
+    replaceMarkdownWithUndo(pendingAiResult.analysis.cleaned, 'AI 排版');
+    setPendingAiResult(null);
+    pushToast('success', 'AI 排版已采用', '如需恢复原文，可在「AI 工具」菜单中撤销。');
   };
 
   const handleIllustrationPlan = async () => {
@@ -497,9 +775,164 @@ function TypesetterView() {
     const preset = presets.find((item) => item.id === value);
     if (!preset) return;
 
-    setActiveTheme(preset.theme as any);
-    setActiveLayoutStyle(preset.layout_style as any);
-    setActiveImageStyle(preset.image_style as any);
+    const presetTheme = preset.theme as unknown as Theme;
+    const presetLayoutStyle = preset.layout_style as unknown as LayoutStyle;
+    const presetImageStyle = preset.image_style as unknown as ImageStyle;
+    const hydratedTheme = {
+      ...(THEMES[presetTheme.id] || DEFAULT_THEME),
+      ...presetTheme,
+    };
+
+    setActiveTheme(hydratedTheme);
+    setActiveLayoutStyle(LAYOUT_STYLES[presetLayoutStyle.id] || presetLayoutStyle || DEFAULT_LAYOUT_STYLE);
+    setActiveImageStyle(IMAGE_STYLES[presetImageStyle.id] || presetImageStyle || DEFAULT_IMAGE_STYLE);
+    setActiveEmphasis(normalizeEmphasisConfig(
+      presetTheme.emphasisConfig,
+      hydratedTheme.emphasis || hydratedTheme.highlight,
+    ));
+    setActiveTypography(normalizeTypographyConfig(
+      presetTheme.typographyConfig,
+      presetLayoutStyle.id,
+    ));
+    setActiveComponentStyle(normalizeComponentStyleConfig(presetTheme.componentStyleConfig));
+  };
+
+  const handleThemeSelect = (theme: Theme) => {
+    setActiveTheme(theme);
+    setActiveEmphasis((current) => ({
+      ...current,
+      color: (theme.emphasis || theme.highlight).toUpperCase(),
+    }));
+  };
+
+  const handleLayoutSelect = (layoutStyle: LayoutStyle) => {
+    setActiveLayoutStyle(layoutStyle);
+    setActiveTypography(createTypographyConfigForLayout(layoutStyle.id));
+    setActiveComponentStyle(DEFAULT_COMPONENT_STYLE_CONFIG);
+  };
+
+  const handleApplyStyleScheme = (scheme: StyleScheme, keepEditing = false) => {
+    if (!keepEditing && editingSchemeId && editingDirty) {
+      const shouldDiscard = window.confirm('当前方案有未保存修改，确定放弃吗？');
+      if (!shouldDiscard) return;
+    }
+    setEditingSchemeId(keepEditing ? scheme.id : null);
+    setActiveTheme(THEMES[scheme.themeId] || DEFAULT_THEME);
+    setActiveLayoutStyle(LAYOUT_STYLES[scheme.layoutId] || DEFAULT_LAYOUT_STYLE);
+    setActiveImageStyle(IMAGE_STYLES[scheme.imageStyleId] || DEFAULT_IMAGE_STYLE);
+    setActiveEmphasis({ ...scheme.emphasis });
+    setActiveTypography({ ...scheme.typography });
+    setActiveComponentStyle({ ...scheme.componentStyle });
+  };
+
+  const updateCustomStyleSchemes = (
+    updater: (current: StyleScheme[]) => StyleScheme[],
+  ) => {
+    setCustomStyleSchemes((current) => {
+      const next = updater(current).slice(0, 30);
+      saveCustomStyleSchemes(next);
+      return next;
+    });
+  };
+
+  const handleCreateCustomStyleScheme = (name: string) => {
+    const scheme = createCustomStyleScheme(name, currentStyleSelection, currentSchemePreview);
+
+    updateCustomStyleSchemes((current) => [scheme, ...current]);
+    setEditingSchemeId(scheme.id);
+    pushToast('success', '方案已创建', `“${scheme.name}”已保存到当前浏览器。`);
+  };
+
+  const handleEditCustomStyleScheme = (scheme: StyleScheme) => {
+    handleApplyStyleScheme(scheme, true);
+    setEditingSchemeId(scheme.id);
+    pushToast('success', '已进入编辑', `现在可以调整“${scheme.name}”的排版配置。`);
+  };
+
+  const handleEditFeaturedStyleScheme = (scheme: StyleScheme) => {
+    const duplicated = duplicateAsCustomStyleScheme(scheme);
+    updateCustomStyleSchemes((current) => [duplicated, ...current]);
+    handleApplyStyleScheme(duplicated, true);
+    setEditingSchemeId(duplicated.id);
+    pushToast('success', '已复制并进入编辑', `“${duplicated.name}”已加入我的方案。`);
+  };
+
+  const handleSaveEditingStyleScheme = () => {
+    if (!editingSchemeId || !editingScheme) return;
+    const updated = updateCustomStyleScheme(editingScheme, currentStyleSelection, currentSchemePreview);
+    updateCustomStyleSchemes((current) => current.map((scheme) => (
+      scheme.id === updated.id ? updated : scheme
+    )));
+    pushToast('success', '修改已保存', `“${updated.name}”已更新。`);
+  };
+
+  const handleSaveAsStyleScheme = (name: string) => {
+    const scheme = createCustomStyleScheme(name, currentStyleSelection, currentSchemePreview);
+    updateCustomStyleSchemes((current) => [scheme, ...current]);
+    setEditingSchemeId(scheme.id);
+    pushToast('success', '方案已另存', `“${scheme.name}”已加入我的方案。`);
+  };
+
+  const handleResetEditingStyleScheme = () => {
+    if (!editingScheme) return;
+    handleApplyStyleScheme(editingScheme, true);
+    pushToast('success', '已恢复保存版本', `“${editingScheme.name}”的未保存修改已撤销。`);
+  };
+
+  const handleDuplicateStyleScheme = (scheme: StyleScheme) => {
+    const duplicated = duplicateAsCustomStyleScheme(scheme);
+    updateCustomStyleSchemes((current) => [duplicated, ...current]);
+    pushToast('success', '方案已复制', `“${duplicated.name}”已加入我的方案。`);
+  };
+
+  const handleDeleteCustomStyleScheme = (schemeId: string) => {
+    const scheme = customStyleSchemes.find((item) => item.id === schemeId);
+    updateCustomStyleSchemes((current) => current.filter((item) => item.id !== schemeId));
+    if (editingSchemeId === schemeId) setEditingSchemeId(null);
+    pushToast('success', '方案已删除', scheme ? `“${scheme.name}”已从当前浏览器移除。` : undefined);
+  };
+
+  const handleMoveCustomStyleScheme = (schemeId: string, direction: -1 | 1) => {
+    updateCustomStyleSchemes((current) => {
+      const index = current.findIndex((item) => item.id === schemeId);
+      const targetIndex = index + direction;
+      if (index < 0 || targetIndex < 0 || targetIndex >= current.length) return current;
+
+      const next = [...current];
+      [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+      return next;
+    });
+  };
+
+  const handleImportCustomStyleSchemes = (raw: string) => {
+    try {
+      const imported = parseImportedStyleSchemes(raw);
+      if (imported.length === 0) {
+        pushToast('error', '导入失败', '文件中没有可用的风格方案。');
+        return;
+      }
+
+      updateCustomStyleSchemes((current) => [...imported, ...current]);
+      setEditingSchemeId(null);
+      pushToast('success', '方案已导入', `已加入 ${imported.length} 套风格方案。`);
+    } catch {
+      pushToast('error', '导入失败', '请选择有效的 JSON 方案文件。');
+    }
+  };
+
+  const handleExportCustomStyleSchemes = () => {
+    if (customStyleSchemes.length === 0) return;
+
+    const blob = new Blob([serializeCustomStyleSchemes(customStyleSchemes)], {
+      type: 'application/json;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `wechat-style-schemes-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    pushToast('success', '方案已导出', `已导出 ${customStyleSchemes.length} 套个人方案。`);
   };
 
   const handleToggleIllustrationItem = (id: string) => {
@@ -542,7 +975,7 @@ function TypesetterView() {
       });
 
       if (job.status === 'completed' && job.resultMarkdown) {
-        setMarkdown(job.resultMarkdown);
+        replaceMarkdownWithUndo(job.resultMarkdown, '应用配图');
       }
       setLastIllustrationJob(job);
       setIllustrationPlan(null);
@@ -611,7 +1044,7 @@ function TypesetterView() {
 
     setIsApplyingIllustrationResult(true);
     try {
-      setMarkdown(lastIllustrationJob.resultMarkdown);
+      replaceMarkdownWithUndo(lastIllustrationJob.resultMarkdown, '应用配图');
       pushToast('success', '结果已应用', `已将 ${lastIllustrationJob.insertedCount} 张配图写回正文。`);
     } finally {
       window.setTimeout(() => {
@@ -654,11 +1087,11 @@ function TypesetterView() {
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
       <ToastStack items={toastItems} onDismiss={dismissToast} />
 
-      <header className="z-20 flex h-14 flex-none items-center justify-between border-b border-gray-200 bg-white px-6 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
+      <header className="z-20 flex h-14 flex-none items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm">
+        <div className="flex min-w-0 items-center space-x-3">
+          <div className="flex flex-none items-center space-x-2">
             <MonitorPlay className="h-5 w-5 text-emerald-600" />
-            <h1 className="text-lg font-bold text-gray-800">公众号排版系统</h1>
+            <h1 className="whitespace-nowrap text-base font-bold text-gray-800">公众号排版系统</h1>
           </div>
 
           <div className="flex items-center space-x-2 border-l border-gray-200 pl-4">
@@ -666,7 +1099,7 @@ function TypesetterView() {
             {Object.values(THEMES).map((theme) => (
               <button
                 key={theme.id}
-                onClick={() => setActiveTheme(theme)}
+                onClick={() => handleThemeSelect(theme)}
                 className={`h-4 w-4 rounded-full ring-offset-1 transition-all ${
                   activeTheme.id === theme.id
                     ? 'scale-110 shadow-sm ring-2 ring-gray-400'
@@ -682,7 +1115,7 @@ function TypesetterView() {
             <span className="mr-1 text-xs font-medium text-gray-400">版式</span>
             <select
               value={activeLayoutStyle.id}
-              onChange={(event) => setActiveLayoutStyle(LAYOUT_STYLES[event.target.value])}
+              onChange={(event) => handleLayoutSelect(LAYOUT_STYLES[event.target.value])}
               className="cursor-pointer rounded-md border-none bg-gray-50 px-2 py-1 text-sm text-gray-700 outline-none focus:ring-1 focus:ring-emerald-500"
             >
               {Object.values(LAYOUT_STYLES).map((style) => (
@@ -740,7 +1173,7 @@ function TypesetterView() {
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-none items-center space-x-2">
           {authUser ? (
             <div className="mr-2 flex items-center space-x-2 rounded-full border border-gray-100 bg-gray-50 px-3 py-1">
               <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
@@ -769,7 +1202,7 @@ function TypesetterView() {
           <HeaderMenu
             label="AI 工具"
             icon={<Wand2 className="mr-1.5 h-4 w-4" />}
-            buttonClassName="flex items-center rounded-full border border-amber-200 bg-amber-50 px-4 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100"
+            buttonClassName="flex items-center whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100"
             items={[
               {
                 key: 'ai-typeset',
@@ -785,13 +1218,19 @@ function TypesetterView() {
                 disabled: isPlanningIllustration,
                 onSelect: () => void handleIllustrationPlan(),
               },
+              ...(undoSnapshot ? [{
+                key: 'undo-replace',
+                label: `撤销：${undoSnapshot.label}`,
+                icon: <Undo2 className="mr-2 h-4 w-4 text-slate-500" />,
+                onSelect: handleUndoReplace,
+              }] : []),
             ]}
           />
 
           <HeaderMenu
             label="更多导出"
             icon={<Share2 className="mr-1.5 h-4 w-4" />}
-            buttonClassName="flex items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+            buttonClassName="flex items-center whitespace-nowrap rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
             items={[
               {
                 key: 'copy-x-thread',
@@ -814,6 +1253,15 @@ function TypesetterView() {
             ]}
           />
 
+          <button
+            onClick={() => navigate('/video-compare')}
+            className="flex items-center whitespace-nowrap rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100"
+            title="打开实时视频对比"
+          >
+            <MonitorPlay className="mr-1.5 h-4 w-4" />
+            视频对比
+          </button>
+
           {!isOnlineMode && (
             <button
               onClick={() => setShowSettings(true)}
@@ -826,7 +1274,7 @@ function TypesetterView() {
 
           <button
             onClick={handleCopy}
-            className="flex items-center rounded-full bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700"
+            className="flex items-center whitespace-nowrap rounded-full bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700"
           >
             <Copy className="mr-1.5 h-4 w-4" />
             复制到公众号
@@ -838,13 +1286,37 @@ function TypesetterView() {
         <section className="flex h-full w-1/2 flex-col border-r border-gray-200 bg-white">
           <div className="flex h-10 flex-none items-center justify-between border-b border-gray-200 bg-white px-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
             <span>Markdown 输入</span>
-            <button
-              onClick={() => setShowCheatsheet(true)}
-              className="flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700"
-            >
-              <BookOpen className="mr-1 h-3.5 w-3.5" />
-              语法参考
-            </button>
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".md,.markdown,.txt"
+                onChange={handleLocalFilePick}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700"
+                title="上传本地 .md / .txt 文件"
+              >
+                <FileText className="mr-1 h-3.5 w-3.5" />
+                本地
+              </button>
+              <button
+                onClick={() => setShowFeishuSidebar(true)}
+                className="flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700"
+              >
+                <Cloud className="mr-1 h-3.5 w-3.5" />
+                飞书
+              </button>
+              <button
+                onClick={() => setShowCheatsheet(true)}
+                className="flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700"
+              >
+                <BookOpen className="mr-1 h-3.5 w-3.5" />
+                语法参考
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-hidden">
             <Editor
@@ -857,8 +1329,8 @@ function TypesetterView() {
         </section>
 
         <section className="flex h-full w-1/2 flex-col bg-gray-100">
-          <div className="z-10 flex h-10 flex-none items-center justify-between border-b border-transparent bg-white px-4 shadow-sm">
-            <div className="flex items-center gap-1">
+          <div className="z-10 flex h-10 flex-none items-center justify-between gap-2 border-b border-transparent bg-white px-3 shadow-sm">
+            <div className="flex shrink-0 items-center gap-1">
               {([
                 { key: 'wechat' as const, label: '公众号' },
                 { key: 'xThread' as const, label: 'X Thread' },
@@ -867,7 +1339,7 @@ function TypesetterView() {
                 <button
                   key={tab.key}
                   onClick={() => handleSelectPreviewTab(tab.key)}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                  className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
                     previewTab === tab.key
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
@@ -877,11 +1349,46 @@ function TypesetterView() {
                 </button>
               ))}
             </div>
-            {previewTab === 'wechat' && (
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                宽度 677px
-              </span>
-            )}
+            <div className="flex shrink-0 items-center gap-2">
+              {previewTab === 'wechat' && (
+                <>
+                  <StyleSchemeControl
+                    activeSchemeId={activeStyleScheme?.id}
+                    customSchemes={customStyleSchemes}
+                    editingSchemeId={editingSchemeId}
+                    editingDirty={editingDirty}
+                    onApply={handleApplyStyleScheme}
+                    onCreate={handleCreateCustomStyleScheme}
+                    onEdit={handleEditCustomStyleScheme}
+                    onEditFeatured={handleEditFeaturedStyleScheme}
+                    onDuplicate={handleDuplicateStyleScheme}
+                    onDelete={handleDeleteCustomStyleScheme}
+                    onMove={handleMoveCustomStyleScheme}
+                    onSaveEditing={handleSaveEditingStyleScheme}
+                    onSaveAs={handleSaveAsStyleScheme}
+                    onResetEditing={handleResetEditingStyleScheme}
+                    onImport={handleImportCustomStyleSchemes}
+                    onExport={handleExportCustomStyleSchemes}
+                  />
+                  <TypographyControl
+                    value={activeTypography}
+                    emphasisValue={activeEmphasis}
+                    themeColor={activeTheme.emphasis || activeTheme.highlight}
+                    layoutId={activeLayoutStyle.id}
+                    onChange={setActiveTypography}
+                    onEmphasisChange={setActiveEmphasis}
+                  />
+                  <ComponentStyleControl
+                    value={activeComponentStyle}
+                    themeColor={activeTheme.primary}
+                    onChange={setActiveComponentStyle}
+                  />
+                  <span className="hidden whitespace-nowrap text-xs font-semibold uppercase tracking-wider text-gray-400 2xl:inline">
+                    宽度 677px
+                  </span>
+                </>
+              )}
+            </div>
           </div>
 
           {previewTab === 'wechat' ? (
@@ -899,6 +1406,9 @@ function TypesetterView() {
                   theme={activeTheme}
                   layoutStyle={activeLayoutStyle}
                   imageStyle={activeImageStyle}
+                  emphasis={activeEmphasis}
+                  typography={activeTypography}
+                  componentStyle={activeComponentStyle}
                 />
               </div>
             </div>
@@ -1023,7 +1533,13 @@ function TypesetterView() {
               </button>
             </div>
 
-            {settingsTab === 'ai' && (
+            {settingsTab === 'ai' && isOnlineMode && (
+              <div className="mb-4 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
+                在线版的 AI 功能由服务端统一提供，无需填写 API Key、接口地址或模型。
+              </div>
+            )}
+
+            {settingsTab === 'ai' && !isOnlineMode && (
               <div className="mb-4 space-y-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">OpenAI 兼容 API Key</label>
@@ -1186,6 +1702,43 @@ function TypesetterView() {
       )}
 
       {showCheatsheet && <CheatsheetModal onClose={() => setShowCheatsheet(false)} />}
+      {showFormatPreferences && (
+        <FormatPreferenceModal
+          value={formatPreferences}
+          onChange={setFormatPreferences}
+          customNote={formatCustomNote}
+          onCustomNoteChange={setFormatCustomNote}
+          onConfirm={() => void runAITypeset()}
+          onClose={() => setShowFormatPreferences(false)}
+        />
+      )}
+      {pendingAiResult && (
+        <AiResultReviewModal
+          original={pendingAiResult.original}
+          analysis={pendingAiResult.analysis}
+          editedDuringRequest={markdown !== pendingAiResult.original}
+          renderPreview={(previewMarkdown) => (
+            <div className="w-full max-w-[677px] bg-white shadow-sm">
+              <Preview
+                elementId="ai-review-preview"
+                markdown={previewMarkdown}
+                theme={activeTheme}
+                layoutStyle={activeLayoutStyle}
+                imageStyle={activeImageStyle}
+                emphasis={activeEmphasis}
+                typography={activeTypography}
+                componentStyle={activeComponentStyle}
+              />
+            </div>
+          )}
+          onAccept={handleAcceptAiResult}
+          onDiscard={() => {
+            setPendingAiResult(null);
+            pushToast('info', '已放弃 AI 排版结果', '正文保持不变。');
+          }}
+        />
+      )}
+
       {showPresetNameModal && (
         <InputPromptModal
           title="保存云端预设"
@@ -1229,6 +1782,11 @@ function TypesetterView() {
           onClose={() => setShowImageExportPanel(false)}
         />
       )}
+      <FeishuSidebar
+        open={showFeishuSidebar}
+        onClose={() => setShowFeishuSidebar(false)}
+        onImport={(title, md) => handleExternalImport(title, md, 'feishu')}
+      />
     </div>
   );
 }

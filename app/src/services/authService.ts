@@ -188,8 +188,12 @@ export async function deletePreset(presetId: string): Promise<void> {
   const workerUrl = getWorkerUrl();
   if (!workerUrl) throw new Error('未配置 Worker URL');
 
-  await fetch(`${workerUrl}/api/user/presets/${presetId}`, {
+  const res = await fetch(`${workerUrl}/api/user/presets/${encodeURIComponent(presetId)}`, {
     method: 'DELETE',
     headers: authHeaders(),
   });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `删除预设失败（Status: ${res.status}）`);
+  }
 }

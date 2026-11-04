@@ -5,6 +5,16 @@ import { handleUpload } from './routes/upload';
 import { handleFormat } from './routes/format';
 import { handleCoverCopy } from './routes/coverCopy';
 import { handleXhsCards } from './routes/xhsCards';
+import {
+  handleFeishuAppConfigGet,
+  handleFeishuAppConfigSave,
+  handleFeishuDisconnect,
+  handleFeishuDocContent,
+  handleFeishuDocs,
+  handleFeishuOauthCallback,
+  handleFeishuOauthUrl,
+  handleFeishuStatus,
+} from './routes/feishu';
 import { handleIllustrationJobCreate, handleIllustrationJobGet, handleIllustrationPlan } from './routes/illustration';
 import { handleChangePassword, handleLogin, handleLogout, handleRegister, handleUserInfo } from './routes/auth';
 import { handleDeletePreset, handleGetPresets, handleSavePreset } from './routes/presets';
@@ -44,6 +54,38 @@ export default {
 
     if (url.pathname === '/api/xhs-cards' && request.method === 'POST') {
       return handleXhsCards(request, env, cors);
+    }
+
+    if (url.pathname === '/api/feishu/oauth/url' && request.method === 'GET') {
+      return handleFeishuOauthUrl(request, env, cors);
+    }
+
+    if (url.pathname === '/api/feishu/oauth/callback' && request.method === 'POST') {
+      return handleFeishuOauthCallback(request, env, cors);
+    }
+
+    if (url.pathname === '/api/feishu/status' && request.method === 'GET') {
+      return handleFeishuStatus(request, env, cors);
+    }
+
+    if (url.pathname === '/api/feishu/app-config' && request.method === 'GET') {
+      return handleFeishuAppConfigGet(request, env, cors);
+    }
+
+    if (url.pathname === '/api/feishu/app-config' && request.method === 'POST') {
+      return handleFeishuAppConfigSave(request, env, cors);
+    }
+
+    if (url.pathname === '/api/feishu/disconnect' && request.method === 'POST') {
+      return handleFeishuDisconnect(request, env, cors);
+    }
+
+    if (url.pathname === '/api/feishu/docs' && request.method === 'GET') {
+      return handleFeishuDocs(request, env, cors);
+    }
+
+    if (url.pathname === '/api/feishu/doc-content' && request.method === 'POST') {
+      return handleFeishuDocContent(request, env, cors);
     }
 
     if (url.pathname === '/api/illustration/plan' && request.method === 'POST') {

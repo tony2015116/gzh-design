@@ -95,11 +95,8 @@ export const generateCoverCopy = async (markdown: string): Promise<CoverCopyProp
         'Content-Type': 'application/json',
         ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
       },
-      body: JSON.stringify({
-        markdown,
-        baseUrl: baseUrl || undefined,
-        model: model || undefined,
-      }),
+      // 上游地址与模型由 Worker 端配置决定，不再从前端传入
+      body: JSON.stringify({ markdown }),
     });
 
     if (!response.ok) {

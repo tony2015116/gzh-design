@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="720" viewBox="0 0 900 720">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff1d9"/>
+      <stop offset="1" stop-color="#efb58c"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="720" fill="url(#bg)"/>
+  <circle cx="180" cy="180" r="115" fill="#fffaf1" opacity="0.74"/>
+  <circle cx="720" cy="580" r="245" fill="#c95f3b" opacity="0.14"/>
+  <path d="M140 535 C240 390 355 410 440 295 C535 165 680 180 770 320" fill="none" stroke="#a64b31" stroke-width="22" stroke-linecap="round" opacity="0.26"/>
+  <text x="130" y="190" fill="#8d402d" font-family="sans-serif" font-size="30" letter-spacing="5">GALLERY 02</text>
+</svg>

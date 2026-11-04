@@ -111,11 +111,17 @@ npx wrangler secret put GEMINI_API_KEY
 
 # 可选：旧上传接口兼容鉴权，一般不需要
 npx wrangler secret put UPLOAD_SECRET
+
+# 可选：飞书文档同步的部署者兜底凭证（见下方说明，多数情况不需要）
+npx wrangler secret put FEISHU_APP_ID
+npx wrangler secret put FEISHU_APP_SECRET
 ```
 
 每条命令会提示你粘贴密钥值（输入不回显）。
 
-如果你的 OpenAI Key 走第三方中转/自托管网关，还需要在 `wrangler.toml` 的 `[vars]` 里确认/添加 API Base 类变量（以代码实际读取为准，可用 `npx wrangler tail` 观察请求地址）。
+飞书文档同步采用「用户自带应用凭证」模式：**普通用户在前端侧边栏自行创建并保存自己的飞书自建应用**（App ID / Secret 存 D1 的 `feishu_apps` 表），无需部署者配置。上面的 `FEISHU_APP_ID/SECRET` 只在你希望同企业用户免配置直接绑定时才需要（此时需在飞书开放平台把重定向 URL 配为 `https://<你的域名>/feishu/callback`）。
+
+如果你的 OpenAI Key 走第三方中转/自托管网关，在 `wrangler.toml` 的 `[vars]` 里设置 `OPENAI_API_BASE`（例如 `https://your-relay.example.com/v1`），需要换模型时设置 `OPENAI_MODEL`。这两个值只在服务端生效，前端设置面板里的 API Base / 模型仅用于 OSS 本地模式。
 
 ---
 
@@ -153,7 +159,26 @@ npx wrangler d1 execute gzh-typesetter-db --remote --file=./schema.sql
 npx wrangler d1 execute gzh-typesetter-db --remote --command="SELECT name FROM sqlite_master WHERE type='table'"
 ```
 
-应看到：`users`、`sessions`、`presets`、`illustration_jobs`、`illustration_items`、`illustration_artifacts`。
+应看到：`users`、`sessions`、`login_attempts`、`ai_usage`、`presets`、`illustration_jobs`、`illustration_items`、`illustration_artifacts`、`feishu_tokens`、`feishu_apps`。
+
+`schema.sql` 全部使用 `CREATE TABLE IF NOT EXISTS`，**已部署过的库重复执行也是安全的**，升级版本后重跑一次即可补齐新表。
+
+> 升级提示：`ai_usage` 表用于 AI 每日额度统计。未建这张表时，AI 排版 / 封面文案 / 图文生成会返回 500「服务端额度表未初始化」。
+
+### 4.1 AI 用量控制（可选调整）
+
+AI 排版、封面文案、图文生成三个接口统一受以下限制，默认值可在 `wrangler.toml` 的 `[vars]` 中覆盖：
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `AI_MAX_INPUT_CHARS` | `30000` | 单次请求的 Markdown 最大字符数，超出返回 413 |
+| `AI_DAILY_QUOTA_FREE` | `20` | free 用户每日调用次数（三个接口合计） |
+| `AI_DAILY_QUOTA_VIP` | `200` | vip 用户每日调用次数 |
+| `AI_DAILY_QUOTA_ANONYMOUS` | `5` | 鉴权关闭（`AI_FORMAT_AUTH_MODE=off`）时，按 IP 计的匿名额度 |
+
+admin 和持有 `UPLOAD_SECRET` 的调用方不计额度。额度按 UTC 日期重置；上游调用失败时自动退回本次计数。
+
+上游地址和模型**只读取** `OPENAI_API_BASE` / `OPENAI_MODEL`，前端无法再指定，避免服务端 Key 被转发到第三方地址。
 
 ---
 
