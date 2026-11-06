@@ -245,7 +245,7 @@ markdown-it 开启了 `html: true`，见 [parser.ts:8](app/src/core/parser.ts#L8
 ### 4.5 仓库整理（P2）
 
 - 根目录有很多和代码无关的文件，例如 `1.jpg`、多张预览 png、`luobo-gzh-design.zip`、测试文章 md、`tishici.txt`、`排版.txt`、`LongImageCard.txt`、`.gzh-typesetter/` 等。建议移到 `docs/` 或 `samples/`，或者加进 `.gitignore`。
-- `task.md`、`implementation_plan.md`、`video_compare_mp4_export_plan.md` 这些过程文档，可以统一放到 `docs/` 下面。
+- `task.md`、`implementation_plan.md`、`video_compare_mp4_export_plan.md` 这些过程文档已整理到 `docs/` 下（已完成的在 `docs/archive/`，未开发的方案在 `docs/plans/`）。
 - 大量改动还没有提交，存在丢失的风险。建议按功能分批提交，例如组件样式体系、小红书图文、飞书同步、视频对比各一批。
 - 网页版排版和 `skills/luobo-gzh-design` 是两套排版实现。如果两边都要长期维护，最好让它们共用一套语法规范，以 [syntax_tutorial.md](syntax_tutorial.md) 为准。
 
@@ -296,7 +296,7 @@ markdown-it 开启了 `html: true`，见 [parser.ts:8](app/src/core/parser.ts#L8
 
 | # | 建议 | 说明 |
 |---|---|---|
-| F18 | **风格方案云同步和分享** | task.md 里还没完成的几项（重命名、云同步、拖拽排序、分享链接）一起做；通过链接分享风格方案，还能起到传播作用 |
+| F18 | **风格方案云同步和分享** | docs/archive/task.md 里还没完成的几项（重命名、云同步、拖拽排序、分享链接）一起做；通过链接分享风格方案，还能起到传播作用 |
 | F19 | **图片素材库** | 传到 R2 的图片目前只是一个个 URL，没有地方管理。做一个"我的图片"面板，可以复用历史图片、查看占用空间，也和 P0-2"上传改成必须登录"的修复对得上 |
 | F20 | **文章历史版本** | 在"自动保存草稿"的基础上保存多个版本，比如 AI 排版前后、手动保存时各存一份，可以回到任意一个版本 |
 

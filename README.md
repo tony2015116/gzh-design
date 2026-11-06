@@ -22,7 +22,7 @@
   - React + TypeScript + Vite 前端
 - [worker](./worker)
   - Cloudflare Worker + D1 + R2 + Workflows 后端
-- [syntax_tutorial.md](./syntax_tutorial.md)
+- [syntax_tutorial.md](./docs/syntax_tutorial.md)
   - Markdown 语法参考素材
 
 ## 当前功能
@@ -399,6 +399,6 @@ npm run dev:oss
 
 ## 子文档
 
-- 部署上线见 [DEPLOYMENT.md](./DEPLOYMENT.md)
+- 部署上线见 [DEPLOYMENT.md](./docs/DEPLOYMENT.md)
 - 前端说明见 [app/README.md](./app/README.md)
 - Worker 说明见 [worker/README.md](./worker/README.md)
