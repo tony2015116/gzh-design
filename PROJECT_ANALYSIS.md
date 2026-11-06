@@ -1,7 +1,7 @@
 # 公众号 Markdown 排版系统：项目分析
 
 > 分析日期：2026-10-02
-> 范围：`app/`（前端）、`worker/`（后端）及仓库根目录。`.claude/skills/` 下的 skill 只做了简要说明。
+> 范围：`app/`（前端）、`worker/`（后端）及仓库根目录。`skills/` 下的 skill 只做了简要说明。
 > 本文只做分析，没有改动任何代码。
 
 ---
@@ -99,7 +99,7 @@
 
 ### 2.5 仓库里的其他内容
 
-- `.claude/skills/luobo-gzh-design`：一个独立的排版 skill。它和网页版的排版能力是两套实现。
+- `skills/luobo-gzh-design`：一个独立的排版 skill。它和网页版的排版能力是两套实现。
 - 根目录散落着一些素材和临时文件，详见 4.5 节。
 
 ---
@@ -247,7 +247,7 @@ markdown-it 开启了 `html: true`，见 [parser.ts:8](app/src/core/parser.ts#L8
 - 根目录有很多和代码无关的文件，例如 `1.jpg`、多张预览 png、`luobo-gzh-design.zip`、测试文章 md、`tishici.txt`、`排版.txt`、`LongImageCard.txt`、`.gzh-typesetter/` 等。建议移到 `docs/` 或 `samples/`，或者加进 `.gitignore`。
 - `task.md`、`implementation_plan.md`、`video_compare_mp4_export_plan.md` 这些过程文档，可以统一放到 `docs/` 下面。
 - 大量改动还没有提交，存在丢失的风险。建议按功能分批提交，例如组件样式体系、小红书图文、飞书同步、视频对比各一批。
-- 网页版排版和 `.claude/skills/luobo-gzh-design` 是两套排版实现。如果两边都要长期维护，最好让它们共用一套语法规范，以 [syntax_tutorial.md](syntax_tutorial.md) 为准。
+- 网页版排版和 `skills/luobo-gzh-design` 是两套排版实现。如果两边都要长期维护，最好让它们共用一套语法规范，以 [syntax_tutorial.md](syntax_tutorial.md) 为准。
 
 ---
 

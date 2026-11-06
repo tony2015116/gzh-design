@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const skillScripts = resolve(appRoot, '../.claude/skills/luobo-gzh-design/scripts');
+const skillScripts = resolve(appRoot, '../skills/luobo-gzh-design/scripts');
 const banner = '// 由 app/scripts/build-skill.mjs 生成，请勿手改。源码在 app/src/skill/ 与网站排版组件。';
 
 await build({

@@ -1,5 +1,5 @@
 // luobo-gzh-design skill 的渲染入口：在 Node 里用网站同一套 parser + 组件把 Markdown 渲染成 HTML。
-// 由 `npm run build:skill` 打包进 .claude/skills/luobo-gzh-design/scripts/renderer.bundle.mjs。
+// 由 `npm run build:skill` 打包进 skills/luobo-gzh-design/scripts/renderer.bundle.mjs。
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Preview } from '../components/preview/Preview';
 import { THEMES } from '../core/theme';

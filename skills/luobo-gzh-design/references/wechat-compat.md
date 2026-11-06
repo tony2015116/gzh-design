@@ -43,4 +43,4 @@
 - 不用 `float`：左右布局用 `display: flex`
 - 不用 `<div>`：用 `<section>` / `<p>` / `<span>`
 - 图片用 `max-width: 100%`，不要 `width: 100%`（多图横排除外）
-- 改完执行 `npm run build:skill`，再用 `node .claude/skills/luobo-gzh-design/scripts/typeset.mjs --input <样例>` 看校验结果
+- 改完执行 `npm run build:skill`，再用 `node skills/luobo-gzh-design/scripts/typeset.mjs --input <样例>` 看校验结果
