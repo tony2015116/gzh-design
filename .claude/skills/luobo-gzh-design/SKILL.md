@@ -1,6 +1,20 @@
 ---
 name: luobo-gzh-design
+display_name: 公众号排版（萝卜哥）
+display_name_en: Luobo WeChat Article Typesetter
 description: 把 Markdown 文章排版成公众号可粘贴的 HTML，效果与「公众号排版系统」网站预览完全一致。触发关键词：公众号排版、微信排版、gzh 排版、typeset for wechat。产物是一个带"复制到公众号"按钮的 HTML 页面，用户在浏览器打开点一下按钮，粘贴到公众号编辑器就是排好版的效果。
+description_zh: 把 Markdown 一键排版成公众号编辑器可直接粘贴的 HTML，自带 6 套风格方案、封面/导读/签名组件和兼容校验。
+description_en: Turn a Markdown article into HTML ready to paste into the WeChat Official Account editor. Ships 6 style schemes, cover/TOC/signature components, and a built-in compatibility checker.
+examples_zh:
+  - "把这篇 Markdown 排成公众号可粘贴的 HTML"
+  - "用玉石商务风格排版，加上封面和文末签名"
+  - "按工具盘点的套路，帮我把这份清单排一下"
+examples_en:
+  - "Typeset this Markdown into HTML I can paste into my WeChat article"
+  - "Use the jade-business scheme, add a cover card and author signature"
+  - "Format this tool roundup following the listicle recipe"
+version: 1.1.0
+author: 萝卜哥
 ---
 
 # 公众号排版 (luobo-gzh-design)
