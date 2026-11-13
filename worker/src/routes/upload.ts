@@ -1,13 +1,16 @@
 import type { Env } from '../types';
 import { getBearerToken, jsonResponse } from '../lib/http';
 import { extFromMime, generateKey } from '../lib/storage';
+import { authenticateUser } from '../lib/auth';
 
 export async function handleUpload(
   request: Request,
   env: Env,
   cors: Record<string, string>,
 ): Promise<Response> {
-  if (env.UPLOAD_SECRET) {
+  if (env.RUNTIME === 'node') {
+    if (!await authenticateUser(request, env)) return jsonResponse({ error: '上传图片需要先登录' }, 401, cors);
+  } else if (env.UPLOAD_SECRET) {
     const token = getBearerToken(request);
     if (token !== env.UPLOAD_SECRET) {
       return jsonResponse({ error: '未授权，请检查 Upload Secret' }, 401, cors);
@@ -28,6 +31,9 @@ export async function handleUpload(
 
   if (!file.type.startsWith('image/')) {
     return jsonResponse({ error: '只允许上传图片文件' }, 400, cors);
+  }
+  if (env.RUNTIME === 'node' && !['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'].includes(file.type)) {
+    return jsonResponse({ error: '只允许 JPEG、PNG、GIF、WebP、AVIF 图片' }, 400, cors);
   }
 
   const maxSize = 10 * 1024 * 1024;

@@ -36,7 +36,7 @@ export async function handleRegister(request: Request, env: Env, cors: Record<st
       .run();
 
     const token = generateSessionToken();
-    await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime("now", "+7 days"))')
+    await env.DB.prepare(`INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime('now', '+7 days'))`)
       .bind(token, userId)
       .run();
 
@@ -87,7 +87,7 @@ export async function handleLogin(request: Request, env: Env, cors: Record<strin
   await env.DB.prepare(`DELETE FROM sessions WHERE expires_at <= datetime('now')`).run();
 
   const token = generateSessionToken();
-  await env.DB.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime("now", "+7 days"))')
+  await env.DB.prepare(`INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime('now', '+7 days'))`)
     .bind(token, user.id)
     .run();
 

@@ -1,4 +1,3 @@
-import puppeteer from '@cloudflare/puppeteer';
 import type { Env, IllustrationAssetResult, IllustrationPlanItem } from '../types';
 import { getFormatPreviewChars, logIllustrationEvent, truncateForLog } from '../lib/logging';
 import { buildPublicFileUrl, extFromMime, sanitizeFileSegment, saveTextArtifact } from '../lib/storage';
@@ -69,10 +68,12 @@ export async function renderHtmlToPng(
   env: Env,
   html: string,
 ): Promise<Uint8Array> {
+  if (env.RENDER_HTML) return env.RENDER_HTML(html);
   if (!env.BROWSER) {
     throw new Error('missing_browser_binding');
   }
 
+  const { default: puppeteer } = await import('@cloudflare/puppeteer');
   const browser = await puppeteer.launch(env.BROWSER);
 
   try {
@@ -160,7 +161,7 @@ export async function renderIllustrationAsset(
 
   const spec = {
     mode: shouldUseInfographicFallback
-      ? (env.BROWSER ? 'browser_rendered_html' : 'svg_infographic')
+      ? (env.BROWSER || env.RENDER_HTML ? 'browser_rendered_html' : 'svg_infographic')
       : 'placeholder_svg',
     context,
     structuredSpec,
@@ -169,7 +170,7 @@ export async function renderIllustrationAsset(
   };
   await saveTextArtifact(env, promptKey, JSON.stringify(spec, null, 2), 'application/json; charset=utf-8');
 
-  if (shouldUseInfographicFallback && env.BROWSER) {
+  if (shouldUseInfographicFallback && (env.BROWSER || env.RENDER_HTML)) {
     const html = buildInfographicHtml(item, context, structuredSpec || undefined);
     const htmlKey = `${baseKey}/html/${String(index + 1).padStart(2, '0')}-${slug}.html`;
     await saveTextArtifact(env, htmlKey, html, 'text/html; charset=utf-8');

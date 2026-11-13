@@ -285,7 +285,7 @@ export function FeishuSidebar({ open, onClose, onImport }: FeishuSidebarProps) {
   };
 
   return (
-    <div className="fixed inset-y-0 left-0 z-40 flex w-[360px] flex-col border-r border-gray-200 bg-white shadow-2xl">
+    <div data-ui-surface className="fixed inset-y-0 left-0 z-40 flex w-[360px] flex-col border-r border-gray-200 bg-white shadow-2xl">
       <div className="flex h-12 flex-none items-center justify-between border-b border-gray-200 px-4">
         <h2 className="text-sm font-semibold text-gray-800">飞书文档</h2>
         <button

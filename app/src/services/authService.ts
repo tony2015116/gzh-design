@@ -65,7 +65,7 @@ export async function logout(): Promise<void> {
 /** Change the current user's password */
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
   const workerUrl = getWorkerUrl();
-  if (!workerUrl) throw new Error('未配置 Worker URL，请在系统设置中配置 R2 Worker 地址');
+  if (!workerUrl) throw new Error('未配置 后端地址，请在系统设置中配置 后端地址');
 
   const res = await fetch(`${workerUrl}/api/auth/change-password`, {
     method: 'POST',
@@ -100,7 +100,7 @@ export function getAuthToken(): string {
 /** Register a new user */
 export async function register(email: string, password: string): Promise<User> {
   const workerUrl = getWorkerUrl();
-  if (!workerUrl) throw new Error('未配置 Worker URL，请在系统设置中配置 R2 Worker 地址');
+  if (!workerUrl) throw new Error('未配置 后端地址，请在系统设置中配置 后端地址');
 
   const res = await fetch(`${workerUrl}/api/auth/register`, {
     method: 'POST',
@@ -117,7 +117,7 @@ export async function register(email: string, password: string): Promise<User> {
 /** Login an existing user */
 export async function login(email: string, password: string): Promise<User> {
   const workerUrl = getWorkerUrl();
-  if (!workerUrl) throw new Error('未配置 Worker URL，请在系统设置中配置 R2 Worker 地址');
+  if (!workerUrl) throw new Error('未配置 后端地址，请在系统设置中配置 后端地址');
 
   const res = await fetch(`${workerUrl}/api/auth/login`, {
     method: 'POST',
@@ -171,7 +171,7 @@ export async function fetchPresets(): Promise<Preset[]> {
 /** Save a new preset */
 export async function savePreset(name: string, theme: any, layoutStyle: any, imageStyle: any): Promise<string> {
   const workerUrl = getWorkerUrl();
-  if (!workerUrl) throw new Error('未配置 Worker URL');
+  if (!workerUrl) throw new Error('未配置 后端地址');
 
   const res = await fetch(`${workerUrl}/api/user/presets`, {
     method: 'POST',
@@ -186,7 +186,7 @@ export async function savePreset(name: string, theme: any, layoutStyle: any, ima
 /** Delete a preset */
 export async function deletePreset(presetId: string): Promise<void> {
   const workerUrl = getWorkerUrl();
-  if (!workerUrl) throw new Error('未配置 Worker URL');
+  if (!workerUrl) throw new Error('未配置 后端地址');
 
   const res = await fetch(`${workerUrl}/api/user/presets/${encodeURIComponent(presetId)}`, {
     method: 'DELETE',

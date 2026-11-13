@@ -58,7 +58,7 @@ export function HeaderMenu({ label, icon, items, buttonClassName }: HeaderMenuPr
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg">
+        <div data-ui-surface className="absolute right-0 z-50 mt-2 w-44 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg">
           {items.map((item) => (
             <button
               key={item.key}

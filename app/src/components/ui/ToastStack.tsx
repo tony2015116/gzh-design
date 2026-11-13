@@ -12,6 +12,7 @@ export interface ToastItem {
 interface ToastStackProps {
   items: ToastItem[];
   onDismiss: (id: string) => void;
+  position?: 'top' | 'bottom';
 }
 
 function toneMeta(tone: ToastTone) {
@@ -41,11 +42,11 @@ function toneMeta(tone: ToastTone) {
   }
 }
 
-export function ToastStack({ items, onDismiss }: ToastStackProps) {
+export function ToastStack({ items, onDismiss, position = 'top' }: ToastStackProps) {
   if (items.length === 0) return null;
 
   return (
-    <div className="pointer-events-none fixed right-5 top-5 z-[80] flex w-[min(28rem,calc(100vw-2rem))] flex-col gap-3">
+    <div className={`pointer-events-none fixed right-5 z-[80] flex w-[min(28rem,calc(100vw-2rem))] flex-col gap-3 ${position === 'bottom' ? 'bottom-5' : 'top-5'}`}>
       {items.map((item) => {
         const meta = toneMeta(item.tone);
         const Icon = meta.icon;
@@ -53,7 +54,7 @@ export function ToastStack({ items, onDismiss }: ToastStackProps) {
         return (
           <div
             key={item.id}
-            className={`pointer-events-auto relative overflow-hidden rounded-[28px] border p-4 shadow-[0_28px_70px_rgba(15,23,42,0.16)] backdrop-blur-xl ${meta.frame}`}
+            className={`ui-toast pointer-events-auto relative overflow-hidden rounded-[28px] border p-4 shadow-[0_28px_70px_rgba(15,23,42,0.16)] backdrop-blur-xl ${meta.frame}`}
           >
             <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${meta.accent}`} />
             <div className="relative flex items-start gap-3">

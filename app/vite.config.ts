@@ -150,11 +150,11 @@ function aiProxyPlugin() {
   }
 }
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, mode }) => ({
   // cloudflare() 只在 build 时启用：它只是为 Cloudflare 静态资产部署服务，
   // dev 时启用会额外拉起 miniflare 并联网拉取 Request.cf 占位数据，
   // 网络不通时会在启动阶段刷 TimeoutError（非致命但很吵）。
-  plugins: [react(), tailwindcss(), ossAiLogPlugin(), aiProxyPlugin(), ...(command === 'build' ? [cloudflare()] : [])],
+  plugins: [react(), tailwindcss(), ossAiLogPlugin(), aiProxyPlugin(), ...(command === 'build' && mode !== 'server' ? [cloudflare()] : [])],
   optimizeDeps: {
     exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],
   },

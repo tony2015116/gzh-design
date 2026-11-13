@@ -174,7 +174,7 @@ export async function handleAdminDiagnostics(
         db: Boolean(env.DB),
         imagesBucket: Boolean(env.IMAGES_BUCKET),
         workflow: Boolean(env.ILLUSTRATION_WORKFLOW),
-        browser: Boolean(env.BROWSER),
+        browser: Boolean(env.BROWSER || env.RENDER_HTML),
       },
       secrets: {
         openAiConfigured: Boolean(env.OPENAI_API_KEY),

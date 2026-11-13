@@ -69,7 +69,7 @@ export function AiResultReviewModal({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.16),transparent_32%),rgba(15,23,42,0.36)] p-4 backdrop-blur-md">
-      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[32px] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_34px_90px_rgba(15,23,42,0.20)]">
+      <div data-ui-surface className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[32px] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94))] shadow-[0_34px_90px_rgba(15,23,42,0.20)]">
         <div className="relative border-b border-slate-200/80 px-6 py-5">
           <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(245,158,11,0.10),rgba(14,165,233,0.06),transparent)]" />
           <div className="relative flex items-start justify-between gap-4">

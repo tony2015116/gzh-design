@@ -168,6 +168,7 @@ export const Editor: React.FC<EditorProps> = ({ value, onChange, editorRef, onSc
         ))}
       </div>
       <textarea
+        aria-label="Markdown 正文"
         ref={editorRef}
         onScroll={handleScroll}
         onPaste={handlePaste}

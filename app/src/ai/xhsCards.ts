@@ -350,7 +350,7 @@ const requestAndParse = async (markdown: string): Promise<XhsDeck> => {
     const bearerToken = authMode === 'real' ? authToken : authToken || secret;
 
     if (!workerUrl) {
-      throw new Error('未配置 Worker URL，请先在在线模式配置可用的 Worker 地址。');
+      throw new Error('未配置 后端地址，请先在在线模式配置可用的后端地址。');
     }
 
     const response = await fetch(`${workerUrl.replace(/\/$/, '')}/api/xhs-cards`, {

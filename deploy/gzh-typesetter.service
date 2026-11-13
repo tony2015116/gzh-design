@@ -1,0 +1,25 @@
+[Unit]
+Description=GZH Typesetter Node Server
+After=network.target
+
+[Service]
+Type=simple
+User=gzh
+Group=gzh
+WorkingDirectory=/opt/gzh-typesetter/server
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/gzh-typesetter/server/.env
+ExecStart=/usr/bin/node index.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/gzh-typesetter/server/data /var/lib/gzh
+Environment=HOME=/var/lib/gzh
+
+[Install]
+WantedBy=multi-user.target

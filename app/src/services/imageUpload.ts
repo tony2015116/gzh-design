@@ -2,7 +2,7 @@
  * Image Upload Service
  *
  * Supports three upload modes:
- * - r2:     Cloudflare R2 via Worker proxy (recommended)
+ * - r2:     服务器图床 via Worker proxy (recommended)
  * - custom: User-configured generic HTTP endpoint
  * - base64: No upload, inline as data URI (default fallback)
  */
@@ -13,7 +13,7 @@
 
 export type UploadMode = 'r2' | 'custom' | 'base64';
 
-/** Cloudflare R2 Worker proxy config */
+/** Server image upload configuration */
 export interface R2Config {
   workerUrl: string;      // e.g. https://gzh-image-worker.yourname.workers.dev
   uploadSecret: string;   // Bearer token for auth
@@ -57,6 +57,10 @@ export function saveUploadMode(mode: UploadMode): void {
 
 // --- R2 Config ---
 export function loadR2Config(): R2Config | null {
+  // Self-hosted builds always use this site's backend, including browsers with old CF settings.
+  if (import.meta.env.VITE_API_SAME_ORIGIN === 'true') {
+    return { workerUrl: window.location.origin, uploadSecret: '' };
+  }
   const raw = localStorage.getItem(R2_CONFIG_KEY) ?? localStorage.getItem(LEGACY_R2_CONFIG_KEY);
   if (!raw) return ENV_R2_CONFIG;
   try {
@@ -156,14 +160,17 @@ export function compressImageToBlob(
  * ============================================================ */
 
 /**
- * Upload a compressed Blob to Cloudflare R2 via Worker proxy.
+ * Upload a compressed Blob to 服务器图床 via Worker proxy.
  */
 export async function uploadImageToR2(blob: Blob, config: R2Config): Promise<string> {
   const formData = new FormData();
   formData.append('file', blob, `image-${Date.now()}.jpg`);
 
   const headers: Record<string, string> = {};
-  if (config.uploadSecret?.trim()) {
+  const authToken = import.meta.env.VITE_API_SAME_ORIGIN === 'true' ? localStorage.getItem('auth_token') : null;
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  } else if (config.uploadSecret?.trim()) {
     headers['Authorization'] = `Bearer ${config.uploadSecret}`;
   }
 
@@ -175,12 +182,12 @@ export async function uploadImageToR2(blob: Blob, config: R2Config): Promise<str
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    throw new Error(`R2 上传失败: HTTP ${response.status} ${text.substring(0, 200)}`);
+    throw new Error(`图片上传失败: HTTP ${response.status} ${text.substring(0, 200)}`);
   }
 
   const json = await response.json();
   if (!json.success || !json.url) {
-    throw new Error(`R2 上传失败: ${JSON.stringify(json).substring(0, 200)}`);
+    throw new Error(`图片上传失败: ${JSON.stringify(json).substring(0, 200)}`);
   }
 
   return json.url;

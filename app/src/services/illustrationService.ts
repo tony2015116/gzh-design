@@ -1682,7 +1682,7 @@ export async function getIllustrationPlan(request: IllustrationPlanRequest): Pro
 
   const workerUrl = getWorkerUrl();
   if (!workerUrl) {
-    throw new Error('未配置 Worker URL，无法请求在线配图建议。');
+    throw new Error('未配置 后端地址，无法请求在线配图建议。');
   }
 
   const token = getAuthToken();
@@ -1719,7 +1719,7 @@ export async function createIllustrationJob(request: IllustrationJobRequest): Pr
 
   const workerUrl = getWorkerUrl();
   if (!workerUrl) {
-    throw new Error('未配置 Worker URL，无法创建在线配图任务。');
+    throw new Error('未配置 后端地址，无法创建在线配图任务。');
   }
 
   const token = getAuthToken();
@@ -1755,7 +1755,7 @@ export async function getIllustrationJob(jobId: string): Promise<IllustrationJob
 
   const workerUrl = getWorkerUrl();
   if (!workerUrl) {
-    throw new Error('未配置 Worker URL，无法查询在线配图任务。');
+    throw new Error('未配置 后端地址，无法查询在线配图任务。');
   }
 
   const token = getAuthToken();

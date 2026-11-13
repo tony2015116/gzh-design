@@ -58,7 +58,7 @@ export default function AdminView() {
       const diagnostics = await fetchWorkerDiagnostics();
       setWorkerDiagnostics(diagnostics);
       if (showToast) {
-        pushToast('success', '线上诊断已刷新', 'Worker 绑定、Secrets 和数据库状态已更新。');
+        pushToast('success', '线上诊断已刷新', '后端服务、密钥配置 和数据库状态已更新。');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '线上诊断请求失败';
@@ -108,7 +108,7 @@ export default function AdminView() {
               <Shield className="h-6 w-6 text-emerald-600" />
               控制台
             </h1>
-            <p className="mt-1 text-sm text-slate-500">统一维护本地配置、当前环境状态和线上 Worker 自检结果。</p>
+            <p className="mt-1 text-sm text-slate-500">统一维护本地配置、当前环境状态和线上后端自检结果。</p>
           </div>
         </div>
 
@@ -116,10 +116,11 @@ export default function AdminView() {
           <div className="overflow-hidden rounded-[28px] border border-white/60 bg-white/85 shadow-[0_28px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl">
             <div className="border-b border-slate-100 px-6 py-6">
               <h2 className="text-lg font-semibold text-slate-900">大模型配置</h2>
-              <p className="mt-1 text-sm text-slate-500">兼容 OpenAI 格式接口。OSS 直接由浏览器使用，online 则用于本地调试与补充说明。</p>
+              <p className="mt-1 text-sm text-slate-500">{isOnlineMode ? '模型由服务器管理员统一配置，个人无需填写 API Key。' : '兼容 OpenAI 格式接口，使用你自己的模型配置。'}</p>
             </div>
 
             <div className="space-y-6 px-6 py-6">
+              {!isOnlineMode && <>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">API Key</label>
                 <input
@@ -154,6 +155,7 @@ export default function AdminView() {
                 </div>
               </div>
 
+              </>}
               <div className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-5">
                 <h3 className="text-sm font-semibold text-slate-900">图片上传与分发</h3>
                 <p className="mt-1 text-sm text-slate-500">维护当前环境默认使用的图床模式和回源地址。</p>
@@ -161,7 +163,7 @@ export default function AdminView() {
                 <div className="mt-4 flex flex-wrap gap-4">
                   <label className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700">
                     <input type="radio" name="uploadMode" value="r2" checked={uploadMode === 'r2'} onChange={() => setUploadModeState('r2')} className="text-emerald-600 focus:ring-emerald-500" />
-                    Cloudflare R2
+                    服务器图床
                   </label>
                   <label className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700">
                     <input type="radio" name="uploadMode" value="custom" checked={uploadMode === 'custom'} onChange={() => setUploadModeState('custom')} className="text-emerald-600 focus:ring-emerald-500" />
@@ -173,10 +175,13 @@ export default function AdminView() {
                   </label>
                 </div>
 
-                {uploadMode === 'r2' && (
+                {uploadMode === 'r2' && import.meta.env.VITE_API_SAME_ORIGIN === 'true' && (
+                  <p className="mt-4 text-sm text-slate-500">图片保存到当前服务器，登录后即可上传。</p>
+                )}
+                {uploadMode === 'r2' && import.meta.env.VITE_API_SAME_ORIGIN !== 'true' && (
                   <div className="mt-4 space-y-4 rounded-[20px] border border-sky-100 bg-sky-50/70 p-4">
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-slate-700">Worker URL</label>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">后端地址</label>
                       <input
                         type="text"
                         placeholder="https://gzh-image-worker..."
@@ -243,14 +248,14 @@ export default function AdminView() {
                   <Activity className="h-5 w-5 text-sky-600" />
                   本地环境诊断
                 </h2>
-                <p className="mt-1 text-sm text-slate-500">不用请求 Worker，直接显示当前浏览器和模式配置。</p>
+                <p className="mt-1 text-sm text-slate-500">不用请求后端，直接显示当前浏览器和模式配置。</p>
               </div>
 
               <div className="space-y-4 px-6 py-6 text-sm text-slate-600">
                 <div className="flex flex-wrap gap-2">
                   {statusChip(localDiagnostics.mode === 'online', `模式：${localDiagnostics.mode}`)}
                   {statusChip(localDiagnostics.localAiConfigured, localDiagnostics.localAiConfigured ? '本地 API Key 已配置' : '本地 API Key 未配置')}
-                  {statusChip(localDiagnostics.workerUrlConfigured, localDiagnostics.workerUrlConfigured ? 'Worker URL 已配置' : 'Worker URL 未配置')}
+                  {statusChip(localDiagnostics.workerUrlConfigured, localDiagnostics.workerUrlConfigured ? '后端地址 已配置' : '后端地址 未配置')}
                 </div>
 
                 <div className="grid gap-3 rounded-[20px] border border-slate-100 bg-slate-50/80 p-4">
@@ -282,7 +287,7 @@ export default function AdminView() {
 
                 {localDiagnostics.workerUrlConfigured && (
                   <div className="rounded-[20px] border border-slate-100 bg-slate-50/80 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Worker URL</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">后端地址</div>
                     <div className="mt-2 break-all text-sm text-slate-700">{localDiagnostics.workerUrl}</div>
                   </div>
                 )}
@@ -292,7 +297,7 @@ export default function AdminView() {
             <div className="overflow-hidden rounded-[28px] border border-white/60 bg-white/85 shadow-[0_28px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl">
               <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-6">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">线上 Worker 诊断</h2>
+                  <h2 className="text-lg font-semibold text-slate-900">线上后端诊断</h2>
                   <p className="mt-1 text-sm text-slate-500">管理员登录后可检查 bindings、secrets、数据库 schema 和最近任务。</p>
                 </div>
                 <button
@@ -314,7 +319,7 @@ export default function AdminView() {
 
                 {isOnlineMode && !canCheckWorkerDiagnostics && (
                   <div className="rounded-[20px] border border-amber-100 bg-amber-50/80 p-4 text-amber-800">
-                    当前身份不是 `admin`，或尚未建立真实登录态，因此不能读取 Worker 诊断接口。
+                    当前身份不是 `admin`，或尚未建立真实登录态，因此不能读取 后端诊断接口。
                   </div>
                 )}
 
@@ -327,10 +332,10 @@ export default function AdminView() {
                 {workerDiagnostics && (
                   <>
                     <div className="flex flex-wrap gap-2">
-                      {statusChip(workerDiagnostics.bindings.db, 'D1')}
-                      {statusChip(workerDiagnostics.bindings.imagesBucket, 'R2')}
-                      {statusChip(workerDiagnostics.bindings.workflow, 'Workflow')}
-                      {statusChip(workerDiagnostics.bindings.browser, workerDiagnostics.bindings.browser ? 'Browser Rendering 已启用' : 'Browser Rendering 未启用')}
+                      {statusChip(workerDiagnostics.bindings.db, '数据库')}
+                      {statusChip(workerDiagnostics.bindings.imagesBucket, '图片存储')}
+                      {statusChip(workerDiagnostics.bindings.workflow, '配图队列')}
+                      {statusChip(workerDiagnostics.bindings.browser, workerDiagnostics.bindings.browser ? '浏览器截图已启用' : '浏览器截图未启用')}
                     </div>
 
                     <div className="grid gap-3 rounded-[20px] border border-slate-100 bg-slate-50/80 p-4">

@@ -1,0 +1,22 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "公众号工作台": {
+      "versions": [
+        {
+          "path": "prototype.html",
+          "createdAt": "2026-11-13T03:03:05.962Z",
+          "status": "needs-review",
+          "viewport": {
+            "width": 1600,
+            "height": 1100
+          }
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-11-13T03:03:05.963Z",
+  "updatedAt": "2026-11-13T03:03:54.135Z"
+}

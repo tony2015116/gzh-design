@@ -1,6 +1,8 @@
 import type { BrowserWorker } from '@cloudflare/puppeteer';
 
 export interface Env {
+  RUNTIME?: 'node';
+  RENDER_HTML?: (html: string) => Promise<Uint8Array>;
   DB: D1Database;
   IMAGES_BUCKET: R2Bucket;
   BROWSER?: BrowserWorker;

@@ -100,7 +100,7 @@ export async function fetchWorkerDiagnostics(): Promise<WorkerDiagnostics> {
   const token = getAuthToken();
 
   if (!workerUrl) {
-    throw new Error('未配置 Worker URL，无法拉取线上诊断信息。');
+    throw new Error('未配置 后端地址，无法拉取线上诊断信息。');
   }
 
   if (!token) {

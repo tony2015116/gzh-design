@@ -54,7 +54,7 @@ export function asFeishuError(err: unknown): FeishuApiError {
 async function feishuRequest<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
   const workerUrl = (loadR2Config()?.workerUrl || '').replace(/\/+$/, '');
   if (!workerUrl) {
-    throw new Error('未配置 Worker URL');
+    throw new Error('未配置 后端地址');
   }
 
   const token = getAuthToken();

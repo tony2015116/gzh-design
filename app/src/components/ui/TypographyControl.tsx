@@ -101,7 +101,7 @@ export function TypographyControl({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-9 z-50 max-h-[calc(100vh-7rem)] w-[380px] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl shadow-gray-900/15">
+        <div className="wb-control-popover absolute right-0 top-9 z-50 max-h-[calc(100vh-7rem)] w-[380px] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4 shadow-2xl shadow-gray-900/15">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">

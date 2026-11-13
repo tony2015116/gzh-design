@@ -360,7 +360,7 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
         </div>
 
         <div className="relative flex items-center justify-between gap-3 border-b border-white/10 px-7 py-4">
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setActiveMode('long')}
               className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${

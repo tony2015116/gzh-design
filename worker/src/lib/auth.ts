@@ -124,7 +124,7 @@ export async function authenticateUser(request: Request, env: Env): Promise<Auth
       SELECT users.id AS id, users.email AS email, users.role AS role
       FROM sessions
       INNER JOIN users ON users.id = sessions.user_id
-      WHERE sessions.token = ? AND sessions.expires_at > datetime("now")
+      WHERE sessions.token = ? AND sessions.expires_at > datetime('now')
     `).bind(token).first<AuthenticatedUser>();
 
     return user ?? null;

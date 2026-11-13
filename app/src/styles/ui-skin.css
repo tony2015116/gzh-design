@@ -1,0 +1,62 @@
+/* Interface skin is independent from article themes and exported content. */
+:root[data-app-skin="dark"] body { background: #101914; }
+[data-app-skin="dark"] .workbench-shell {
+  --wb-green: #61cda6;
+  --wb-ink: #e1ece5;
+  --wb-muted: #96aa9d;
+  --wb-line: #2c4033;
+  background: #111b16;
+  color: var(--wb-ink);
+  color-scheme: dark;
+}
+[data-app-skin="dark"] :is(.wb-sidebar, .wb-topbar, .wb-toolbar, .wb-editor-grid, .wb-pane-heading, .wb-control-popover, .wb-roadmap) { background: #19251e; border-color: #2c4033; color: #c5d6cb; }
+[data-app-skin="dark"] :is(.wb-brand, .wb-heading h1, .wb-roadmap h2, .wb-account strong) { color: #e1ece5; }
+[data-app-skin="dark"] .wb-brand-mark { background: #20835f; color: #e6fff2; }
+[data-app-skin="dark"] :is(.wb-nav-label, .wb-subtitle, .wb-phase p, .wb-roadmap p, .wb-breadcrumb, .wb-editor-footer) { color: #91a898; }
+[data-app-skin="dark"] :is(.wb-eyebrow, .wb-phase>small, .wb-draft-state, .wb-editor-footer span, .wb-preview-width) { color: #a2b9aa; }
+[data-app-skin="dark"] .wb-nav-item { color: #afc5b7; }
+[data-app-skin="dark"] .wb-nav-item:hover { background: #21382b; }
+[data-app-skin="dark"] .wb-nav-item.is-active { background: #1c3b2c; color: #7addb6; }
+[data-app-skin="dark"] :is(.wb-tag, .wb-top-role, .wb-avatar) { background: #24392c; border-color: #35513f; color: #adcbb8; }
+[data-app-skin="dark"] .wb-tag.green { background: #204b35; color: #83dfb6; }
+[data-app-skin="dark"] :is(.wb-phase, .wb-next, .wb-roadmap-flow) { background: #182c20; border-color: #304c37; }
+[data-app-skin="dark"] :is(.wb-phase strong, .wb-next strong, .wb-next button, .wb-roadmap-flow) { color: #accbb5; }
+[data-app-skin="dark"] .wb-breadcrumb strong { color: #c2d5c9; }
+[data-app-skin="dark"] .wb-editor-body textarea { background: #141f19; color: #c5d8cb; caret-color: #7fe2b2; }
+[data-app-skin="dark"] .wb-editor-body>div>div { background: #17231b; color: #718d79; border-color: #293e30; }
+[data-app-skin="dark"] :is(.wb-editor-footer, .wb-editor-pane, .wb-account) { border-color: #2c4033; }
+[data-app-skin="dark"] :is(.wb-preview-pane, .wb-preview-scroll) { background: #0f1a13; }
+[data-app-skin="dark"] .wb-preview-frame { outline-color: #36513f; box-shadow: 0 7px 28px #0003; }
+/* Preview paper, inline article styles, and exported DOM are deliberately untouched. */
+[data-app-skin="dark"] :is(#wechat-article-preview, #ai-result-preview) { color-scheme: light; }
+[data-app-skin="dark"] :is(.wb-style-controls select, .wb-preview-width) { background: #213329; color: #c1d6c8; border-color: #38523f; }
+[data-app-skin="dark"] .wb-actions :is(.wb-image-action, .wb-focus-toggle, .wb-skin-toggle, [aria-haspopup="menu"]) { background: #1d3024; border-color: #375340; color: #c4dacb; }
+[data-app-skin="dark"] .wb-actions :is(.wb-image-action, .wb-focus-toggle, .wb-skin-toggle, [aria-haspopup="menu"]):hover { background: #294433; }
+[data-app-skin="dark"] .wb-actions .wb-copy-action { background: #178362; color: #f1fff8; }
+[data-app-skin="dark"] .wb-preview-tabs button { color: #a4bdae; }
+[data-app-skin="dark"] .wb-preview-tabs button[aria-selected="true"] { background: #244b35; color: #87e0b9; }
+[data-app-skin="dark"] .wb-preview-settings>div>button { background: #213329; border-color: #3d5746; color: #bbd5c5; }
+[data-app-skin="dark"] .wb-import-actions button { color: #a5cbb4; }
+[data-app-skin="dark"] .wb-import-actions button:hover { background: #254432; }
+[data-app-skin="dark"] .wb-focus-toggle kbd { border-color: #45624d; color: #b1c8ba; }
+[data-app-skin="dark"] .wb-roadmap-close { background: #208964; color: #effff5; }
+[data-app-skin="dark"] .wb-draft-state.is-error { color: #f0a38f; }
+.wb-skin-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.wb-skin-options button { display: flex; align-items: center; justify-content: center; gap: 9px; padding: 13px; border: 1px solid #dde7e0; border-radius: 9px; background: #f8fbf9; color: #6d8375; font-size: 13px; }
+.wb-skin-options button[aria-pressed="true"] { background: #eaf7ee; border-color: #399e75; color: #087750; box-shadow: 0 0 0 1px #399e75; }
+.wb-focus-settings { display: flex; align-items: center; justify-content: center; border: 1px solid var(--wb-line); background: #fff; color: #617c69; }
+[data-app-skin="dark"] .wb-skin-options button { background: #1c3023; color: #adc8b6; border-color: #3d5946; }
+[data-app-skin="dark"] .wb-skin-options button[aria-pressed="true"] { background: #234c34; border-color: #71c79c; color: #d0f5df; box-shadow: 0 0 0 1px #71c79c; }
+[data-app-skin="dark"] .wb-focus-settings { background: #1d3024; color: #c4dacb; border-color: #375340; }
+/* UI chrome is explicitly marked so theme changes cannot leak into article exports. */
+[data-app-skin="dark"] [data-ui-surface] { color-scheme: dark; background: #19271f; background-image: none; border-color: #3b5142; color: #d6e5dc; }
+[data-app-skin="dark"] :is([data-ui-surface], .wb-control-popover, .wb-actions [role="menu"], .wb-mobile-navigation) :is(.bg-white, .bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100, [class*="bg-white/"], [class*="bg-slate-50/"], [class*="bg-gray-50/"]) { background-color: #21352a; }
+[data-app-skin="dark"] :is([data-ui-surface], .wb-control-popover, .wb-actions [role="menu"], .wb-mobile-navigation) :is(.text-gray-900, .text-gray-800, .text-gray-700, .text-slate-900, .text-slate-800, .text-slate-700) { color: #d5e6da; }
+[data-app-skin="dark"] :is([data-ui-surface], .wb-control-popover, .wb-actions [role="menu"], .wb-mobile-navigation) :is(.text-gray-600, .text-gray-500, .text-gray-400, .text-slate-600, .text-slate-500, .text-slate-400) { color: #a4baaa; }
+[data-app-skin="dark"] :is([data-ui-surface], .wb-control-popover) :is(.border-gray-100, .border-gray-200, .border-gray-300, .border-slate-100, .border-slate-200, [class*="border-slate-200/"], [class*="border-white/"]) { border-color: #3c5243; }
+[data-app-skin="dark"] :is([data-ui-surface], .wb-control-popover) :is(.bg-emerald-50, .bg-amber-50, .bg-sky-50) { background-color: #24412f; }
+[data-app-skin="dark"] :is([data-ui-surface], .wb-control-popover) :is(.text-emerald-800, .text-emerald-700, .text-emerald-600, .text-amber-700) { color: #88d5ae; }
+[data-app-skin="dark"] :is([data-ui-surface], .wb-control-popover) :is(input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), textarea, select) { background-color: #132319; color: #d2e5d9; border-color: #3c5a46; }
+[data-app-skin="dark"] .ui-toast { background: #203d2d; background-image: none; border-color: #406c51; color: #e0f2e6; }
+[data-app-skin="dark"] .ui-toast .text-slate-600 { color: #bbd3c3; }
+[data-app-skin="dark"] .wb-roadmap-note { color: #9cb8a6; }

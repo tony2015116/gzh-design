@@ -8,17 +8,15 @@ import {
   FileText,
   ImageDown,
   ImagePlus,
-  LogOut,
   MessageSquareQuote,
-  MonitorPlay,
-  Settings,
   Share2,
   Undo2,
-  User as UserIcon,
   Wand2,
 } from 'lucide-react';
 
 import { getAITypesetMarkdown } from '../ai/formatter';
+import { WorkbenchShell } from '../components/workbench/WorkbenchShell';
+import { UiSkinControl } from '../components/workbench/UiSkinControl';
 import { analyzeAiTypesetOutput } from '../ai/aiOutputCheck';
 import type { AiOutputAnalysis } from '../ai/aiOutputCheck';
 import { AiResultReviewModal } from '../components/ui/AiResultReviewModal';
@@ -212,6 +210,8 @@ function TypesetterView() {
   const navigate = useNavigate();
 
   const [markdown, setMarkdown] = useState(() => loadDraft() ?? defaultMarkdown);
+  const [draftSaveState, setDraftSaveState] = useState<'saving' | 'saved' | 'error'>('saving');
+  const [previewWidth, setPreviewWidth] = useState<375 | 677>(375);
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(loadUndoSnapshot);
   const [pendingAiResult, setPendingAiResult] = useState<{
     original: string;
@@ -395,8 +395,10 @@ function TypesetterView() {
   // 草稿自动保存：停止输入 800ms 后写入本地；存储写满时只提醒一次
   const draftSaveFailedRef = useRef(false);
   useEffect(() => {
+    setDraftSaveState('saving');
     const timer = window.setTimeout(() => {
       const ok = saveDraft(markdown);
+      setDraftSaveState(ok ? 'saved' : 'error');
       if (!ok && !draftSaveFailedRef.current) {
         draftSaveFailedRef.current = true;
         pushToast('error', '草稿自动保存失败', '浏览器本地存储已满（base64 图片很占空间），建议改用图床上传图片。');
@@ -1084,16 +1086,21 @@ function TypesetterView() {
   };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
-      <ToastStack items={toastItems} onDismiss={dismissToast} />
+    <div className="typesetter-root">
+      <ToastStack items={toastItems} onDismiss={dismissToast} position="bottom" />
 
-      <header className="z-20 flex h-14 flex-none items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm">
-        <div className="flex min-w-0 items-center space-x-3">
-          <div className="flex flex-none items-center space-x-2">
-            <MonitorPlay className="h-5 w-5 text-emerald-600" />
-            <h1 className="whitespace-nowrap text-base font-bold text-gray-800">公众号排版系统</h1>
-          </div>
-
+      <WorkbenchShell
+        userName={authUser?.email.split('@')[0]}
+        userRole={authUser?.role}
+        realAuth={isRealAuth}
+        draftState={draftSaveState}
+        onLogin={() => { saveDraft(markdown); navigate('/login', { state: { from: '/' } }); }}
+        onLogout={() => void handleLogout()}
+        onSettings={() => setShowSettings(true)}
+        onConsole={() => { saveDraft(markdown); navigate('/admin'); }}
+        onHelp={() => setShowCheatsheet(true)}
+        onVideo={() => { saveDraft(markdown); navigate('/video-compare'); }}
+        toolbar={(<div className="wb-style-controls">
           <div className="flex items-center space-x-2 border-l border-gray-200 pl-4">
             <span className="mr-1 text-xs font-medium text-gray-400">主题</span>
             {Object.values(THEMES).map((theme) => (
@@ -1107,6 +1114,8 @@ function TypesetterView() {
                 }`}
                 style={{ background: theme.primary }}
                 title={theme.name}
+                aria-label={theme.name}
+                aria-pressed={activeTheme.id === theme.id}
               />
             ))}
           </div>
@@ -1115,6 +1124,7 @@ function TypesetterView() {
             <span className="mr-1 text-xs font-medium text-gray-400">版式</span>
             <select
               value={activeLayoutStyle.id}
+              aria-label="文章版式"
               onChange={(event) => handleLayoutSelect(LAYOUT_STYLES[event.target.value])}
               className="cursor-pointer rounded-md border-none bg-gray-50 px-2 py-1 text-sm text-gray-700 outline-none focus:ring-1 focus:ring-emerald-500"
             >
@@ -1130,6 +1140,7 @@ function TypesetterView() {
             <span className="mr-1 text-xs font-medium text-gray-400">图片</span>
             <select
               value={activeImageStyle.id}
+              aria-label="图片样式"
               onChange={(event) => setActiveImageStyle(IMAGE_STYLES[event.target.value])}
               className="cursor-pointer rounded-md border-none bg-gray-50 px-2 py-1 text-sm text-gray-700 outline-none focus:ring-1 focus:ring-emerald-500"
             >
@@ -1145,6 +1156,7 @@ function TypesetterView() {
             <select
               className="w-36 cursor-pointer rounded-md border-none bg-gray-50 px-2 py-1 text-sm font-medium text-emerald-700 outline-none focus:ring-1 focus:ring-emerald-500"
               defaultValue=""
+              aria-label="云端预设"
               onChange={(event) => {
                 handlePresetSelect(event.target.value);
                 event.target.value = '';
@@ -1172,33 +1184,11 @@ function TypesetterView() {
             </select>
           </div>
         </div>
-
-        <div className="flex flex-none items-center space-x-2">
-          {authUser ? (
-            <div className="mr-2 flex items-center space-x-2 rounded-full border border-gray-100 bg-gray-50 px-3 py-1">
-              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                {authUser.role.toUpperCase()}
-              </span>
-              <span className="text-sm font-medium text-gray-600">{authUser.email.split('@')[0]}</span>
-              <button
-                onClick={handleLogout}
-                className="ml-1 text-gray-400 transition-colors hover:text-red-500"
-                title="退出登录"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            </div>
-          ) : isRealAuth ? (
-            <button
-              onClick={() => navigate('/login', { state: { from: '/' } })}
-              className="mr-2 flex items-center space-x-1 rounded-full bg-emerald-50 px-4 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
-              title="登录或注册"
-            >
-              <UserIcon className="h-4 w-4" />
-              <span>登录</span>
-            </button>
-          ) : null}
-
+)}
+        actions={(<>
+          <button className="wb-image-action flex items-center whitespace-nowrap" data-action="image-export" onClick={() => setShowImageExportPanel(true)}>
+            <ImageDown className="mr-1.5 h-4 w-4" />导出图片
+          </button>
           <HeaderMenu
             label="AI 工具"
             icon={<Wand2 className="mr-1.5 h-4 w-4" />}
@@ -1253,40 +1243,26 @@ function TypesetterView() {
             ]}
           />
 
-          <button
-            onClick={() => navigate('/video-compare')}
-            className="flex items-center whitespace-nowrap rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-100"
-            title="打开实时视频对比"
-          >
-            <MonitorPlay className="mr-1.5 h-4 w-4" />
-            视频对比
-          </button>
 
-          {!isOnlineMode && (
-            <button
-              onClick={() => setShowSettings(true)}
-              className="rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-              title="设置 API Key"
-            >
-              <Settings className="h-5 w-5" />
-            </button>
-          )}
+
+
 
           <button
             onClick={handleCopy}
-            className="flex items-center whitespace-nowrap rounded-full bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700"
+            className="wb-copy-action flex items-center whitespace-nowrap rounded-full bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700"
           >
             <Copy className="mr-1.5 h-4 w-4" />
             复制到公众号
           </button>
-        </div>
-      </header>
 
-      <main className="flex flex-1 overflow-hidden">
-        <section className="flex h-full w-1/2 flex-col border-r border-gray-200 bg-white">
-          <div className="flex h-10 flex-none items-center justify-between border-b border-gray-200 bg-white px-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+        </>)}
+      >
+
+      <main className="wb-editor-grid">
+        <section className="wb-editor-pane">
+          <div className="wb-pane-heading">
             <span>Markdown 输入</span>
-            <div className="flex items-center gap-2">
+            <div className="wb-import-actions">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1318,7 +1294,7 @@ function TypesetterView() {
               </button>
             </div>
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="wb-editor-body">
             <Editor
               value={markdown}
               onChange={setMarkdown}
@@ -1326,11 +1302,12 @@ function TypesetterView() {
               onScroll={handleEditorScroll}
             />
           </div>
+          <footer className="wb-editor-footer"><span>{markdown.replace(/\s/g, '').length.toLocaleString()} 字符</span><span>Markdown · 自动保存到本机</span></footer>
         </section>
 
-        <section className="flex h-full w-1/2 flex-col bg-gray-100">
-          <div className="z-10 flex h-10 flex-none items-center justify-between gap-2 border-b border-transparent bg-white px-3 shadow-sm">
-            <div className="flex shrink-0 items-center gap-1">
+        <section className="wb-preview-pane">
+          <div className="wb-pane-heading wb-preview-heading">
+            <div className="wb-preview-tabs" role="tablist" aria-label="预览平台">
               {([
                 { key: 'wechat' as const, label: '公众号' },
                 { key: 'xThread' as const, label: 'X Thread' },
@@ -1339,6 +1316,8 @@ function TypesetterView() {
                 <button
                   key={tab.key}
                   onClick={() => handleSelectPreviewTab(tab.key)}
+                  role="tab"
+                  aria-selected={previewTab === tab.key}
                   className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
                     previewTab === tab.key
                       ? 'bg-emerald-600 text-white shadow-sm'
@@ -1349,7 +1328,7 @@ function TypesetterView() {
                 </button>
               ))}
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="wb-preview-settings">
               {previewTab === 'wechat' && (
                 <>
                   <StyleSchemeControl
@@ -1383,9 +1362,10 @@ function TypesetterView() {
                     themeColor={activeTheme.primary}
                     onChange={setActiveComponentStyle}
                   />
-                  <span className="hidden whitespace-nowrap text-xs font-semibold uppercase tracking-wider text-gray-400 2xl:inline">
-                    宽度 677px
-                  </span>
+                  <select className="wb-preview-width" value={previewWidth} onChange={event => setPreviewWidth(Number(event.target.value) as 375 | 677)} aria-label="预览宽度">
+                    <option value={375}>手机 375px</option>
+                    <option value={677}>宽屏 677px</option>
+                  </select>
                 </>
               )}
             </div>
@@ -1395,11 +1375,13 @@ function TypesetterView() {
             <div
               ref={previewScrollRef}
               onScroll={handlePreviewScroll}
-              className="flex-1 overflow-auto p-4 md:p-8"
+              className="wb-preview-scroll"
             >
               <div
-                style={{ width: '677px', margin: '0 auto' }}
-                className="min-h-[800px] flex-shrink-0 overflow-hidden rounded-xl bg-white shadow-xl outline outline-1 outline-gray-200/50"
+                style={{ width: `${previewWidth}px`, margin: '0 auto' }}
+                data-preview-frame
+                data-width={previewWidth}
+                className="wb-preview-frame"
               >
                 <Preview
                   markdown={markdown}
@@ -1459,11 +1441,14 @@ function TypesetterView() {
           )}
         </section>
       </main>
+      </WorkbenchShell>
 
       {showSettings && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="m-4 w-[480px] max-w-full rounded-[20px] bg-white/95 p-8 shadow-2xl ring-1 ring-black/5 animate-in zoom-in-95 duration-200">
-            <h3 className="mb-6 text-xl font-bold text-gray-900">系统设置</h3>
+          <div data-ui-surface role="dialog" aria-modal="true" aria-labelledby="workbench-settings-title" className="m-4 max-h-[calc(100dvh-2rem)] w-[480px] max-w-full overflow-y-auto rounded-[20px] bg-white/95 p-8 shadow-2xl ring-1 ring-black/5 animate-in zoom-in-95 duration-200">
+            <div className="mb-6 flex items-center justify-between gap-3"><h3 id="workbench-settings-title" className="text-xl font-bold text-gray-900">工作台设置</h3><button type="button" aria-label="关闭工作台设置" onClick={() => setShowSettings(false)} className="rounded-lg px-2 py-1 text-xl text-gray-500 hover:bg-gray-100">×</button></div>
+
+            <UiSkinControl />
 
             {showDevIdentity && (
               <div className="mb-5">
@@ -1580,7 +1565,7 @@ function TypesetterView() {
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">上传模式</label>
                   <div className="flex space-x-1 rounded-lg bg-gray-100 p-1">
                     {([
-                      { key: 'r2' as UploadMode, label: 'Cloudflare R2' },
+                      { key: 'r2' as UploadMode, label: '服务器图床' },
                       { key: 'custom' as UploadMode, label: '自定义 CDN' },
                       { key: 'base64' as UploadMode, label: 'Base64' },
                     ]).map((mode) => (
@@ -1599,11 +1584,14 @@ function TypesetterView() {
                   </div>
                 </div>
 
-                {uploadMode === 'r2' && (
+                {uploadMode === 'r2' && import.meta.env.VITE_API_SAME_ORIGIN === 'true' && (
+                  <p className="text-sm text-gray-500">图片保存到当前服务器，登录后即可上传。</p>
+                )}
+                {uploadMode === 'r2' && import.meta.env.VITE_API_SAME_ORIGIN !== 'true' && (
                   <>
                     <div>
                       <label className="mb-1 block text-sm font-medium text-gray-700">
-                        Worker URL <span className="text-red-400">*</span>
+                        后端地址 <span className="text-red-400">*</span>
                       </label>
                       <input
                         type="text"

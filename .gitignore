@@ -29,6 +29,11 @@ logs
 # output
 output
 
+# 自托管服务器持久化数据
+server/data/
+*.sqlite-wal
+*.sqlite-shm
+
 # 本地图片
 1.jpg
 tishici.txt

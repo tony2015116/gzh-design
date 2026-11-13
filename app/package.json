@@ -10,6 +10,7 @@
     "build": "tsc -b && vite build --mode oss",
     "build:oss": "tsc -b && vite build --mode oss",
     "build:online": "tsc -b && vite build --mode online",
+    "build:server": "tsc -b && vite build --mode server",
     "lint": "eslint .",
     "preview": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
