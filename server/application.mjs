@@ -36,7 +36,7 @@ export async function createApplication({ dataDir, staticDir, publicUrl, config 
   queue.start();
   const phaseTwoEnabled = config.NODE_ENV !== 'production' && config.ENABLE_PHASE2 === '1';
   const discovery = phaseTwoEnabled ? await (await import('./discovery/routes.mjs')).createDiscovery(db, env, config, redfoxFetch) : null;
-  const articles = createArticles(db, env);
+  const articles = phaseTwoEnabled ? createArticles(db, env) : null;
   const root = resolve(staticDir);
   const maxBodyBytes = 12 * 1024 * 1024;
 
@@ -45,7 +45,7 @@ export async function createApplication({ dataDir, staticDir, publicUrl, config 
       const url = new URL(req.url, origin);
       // Ignore client supplied Host / forwarded headers when generating public URLs.
       if (url.origin !== origin) return res.writeHead(400).end();
-      const phaseTwoPath = /^\/api\/(?:discovery|topics)(?:\/|$)/.test(url.pathname);
+      const phaseTwoPath = /^\/api\/(?:articles|discovery|topics)(?:\/|$)/.test(url.pathname);
       if (phaseTwoPath && !phaseTwoEnabled) {
         return res.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end(JSON.stringify({ error: '接口不存在' }));
       }
@@ -85,7 +85,7 @@ export async function createApplication({ dataDir, staticDir, publicUrl, config 
         && loopback(requestOrigin.hostname) && requestOrigin.port === new URL(origin).port
         && (!req.headers.origin || req.headers.origin === requestOrigin.origin)
         && (!req.headers['sec-fetch-site'] || ['same-origin', 'none'].includes(req.headers['sec-fetch-site']));
-      const response = await articles.fetch(request) ?? await discovery?.fetch(request, { localDebug }) ?? await router.fetch(request, env);
+      const response = await articles?.fetch(request) ?? await discovery?.fetch(request, { localDebug }) ?? await router.fetch(request, env);
       const outputHeaders = Object.fromEntries(response.headers);
       outputHeaders['X-Content-Type-Options'] = 'nosniff';
       outputHeaders['Referrer-Policy'] = 'no-referrer';

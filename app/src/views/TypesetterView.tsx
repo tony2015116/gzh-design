@@ -261,7 +261,7 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
   const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
   const [apiBaseUrl, setApiBaseUrl] = useState(localStorage.getItem('openai_api_base') || '');
   const [apiModel, setApiModel] = useState(localStorage.getItem('openai_model') || '');
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettings, setShowSettings] = useState(() => new URLSearchParams(location.search).get('settings') === '1');
   const [showCheatsheet, setShowCheatsheet] = useState(false);
   const [activeTheme, setActiveTheme] = useState<Theme>(DEFAULT_THEME);
   const [activeLayoutStyle, setActiveLayoutStyle] = useState<LayoutStyle>(DEFAULT_LAYOUT_STYLE);
@@ -1217,7 +1217,7 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
         </div>
 )}
         actions={(<>
-          <ArticleControls markdown={markdown} owner={draftOwner} onLogin={() => {
+          {phaseTwoEnabled && <ArticleControls markdown={markdown} owner={draftOwner} onLogin={() => {
             if (!saveDraft(latestMarkdown.current, draftOwner)) { pushToast('error', '草稿保存失败', '请先导出正文，再登录。'); return; }
             navigate('/login', { state: { from: '/' } });
           }} onLoad={(text,article) => {
@@ -1227,7 +1227,7 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
             catch { throw new Error('本机存储写入失败，未载入文章，请先导出当前正文。'); }
             setUndoSnapshot(snapshot);
             setMarkdown(text);
-          }}/>
+          }}/>}
           <button className="wb-image-action flex items-center whitespace-nowrap" data-action="image-export" onClick={() => setShowImageExportPanel(true)}>
             <ImageDown className="mr-1.5 h-4 w-4" />导出图片
           </button>

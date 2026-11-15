@@ -8,7 +8,7 @@ import {createApplication} from '../application.mjs';
 
 test('saved articles enforce real sessions, ownership, revision conflicts and persistent search pagination',async()=>{
  const dir=await mkdtemp(join(tmpdir(),'gzh-articles-'));let app,server,base;
- const start=async()=>{app=await createApplication({dataDir:dir,staticDir:dir,publicUrl:'http://localhost',config:{}});server=createServer(app.handle);await new Promise(r=>server.listen(0,'127.0.0.1',r));base=`http://127.0.0.1:${server.address().port}`;};
+ const start=async()=>{app=await createApplication({dataDir:dir,staticDir:dir,publicUrl:'http://localhost',config:{NODE_ENV:'development',ENABLE_PHASE2:'1'}});server=createServer(app.handle);await new Promise(r=>server.listen(0,'127.0.0.1',r));base=`http://127.0.0.1:${server.address().port}`;};
  const stop=async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));await app.close();};
  const api=async(path,token,body,method=body===undefined?'GET':'POST')=>{const r=await fetch(base+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});return {status:r.status,data:await r.json()};};
  try{await start();

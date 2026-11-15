@@ -5,10 +5,11 @@ import {join,resolve} from 'node:path';
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
 import {createApplication} from '../application.mjs';
+import {createPhaseTwoFrontend} from './phase-two-frontend.mjs';
 const root=resolve(import.meta.dirname,'../..'),out=join(root,'output/my-articles'),dir=await mkdtemp(join(tmpdir(),'gzh-articles-ui-'));
-let app,server,browser;const errors=[];
+let frontend,app,server,browser;const errors=[];
 try{
- await mkdir(out,{recursive:true});server=createServer((req,res)=>app.handle(req,res));await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;app=await createApplication({dataDir:dir,staticDir:join(root,'app/dist'),publicUrl:base,config:{}});
+ await mkdir(out,{recursive:true});frontend=await createPhaseTwoFrontend(root);server=createServer((req,res)=>frontend.handle(req,res,app));await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;app=await createApplication({dataDir:dir,staticDir:join(root,'app/dist'),publicUrl:base,config:{NODE_ENV:'development',ENABLE_PHASE2:'1'}});
  const api=async(path,token,body,method=body?'POST':'GET')=>{const r=await fetch(base+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,data:await r.json()};};
  const a=(await api('/api/auth/register',null,{email:'writer@example.test',password:'Article-test123'})).data;
  browser=await puppeteer.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,protocolTimeout:20000});const page=await browser.newPage();page.on('pageerror',e=>errors.push(e.message));await page.setViewport({width:1440,height:1000});
@@ -34,4 +35,4 @@ try{
  await click('删除');await page.waitForSelector('dialog[aria-label="删除文章"]');await click('取消');assert.equal((await api('/api/articles',a.token)).data.total,2);await click('删除');await click('确认删除');await page.waitForFunction(()=>!document.querySelector('dialog'));assert.equal((await api('/api/articles',a.token)).data.total,1);
  await page.goto(base+'/',{waitUntil:'networkidle0'});const retained=await page.$eval('textarea[aria-label="Markdown 正文"]',e=>e.value);await click('保存文章');await page.waitForSelector('#saved-article-title');await click('保留当前正文，作为新稿继续编辑');await page.waitForSelector('dialog[aria-label="作为新稿继续编辑"]');await click('作为新稿');await page.reload({waitUntil:'networkidle0'});assert.equal(await page.$eval('textarea[aria-label="Markdown 正文"]',e=>e.value),retained);await click('保存文章');await page.waitForSelector('#saved-article-title');assert.equal(await page.$('.article-checkbox'),null);await click('取消');
  assert.deepEqual(errors,[]);const report={realAccountRequired:true,savedToServer:true,independentBrowserRead:true,openRequiresConfirmation:true,storageFailureRetainsDraft:true,previousDraftUndo:true,guestDraftRetained:true,updateSavedArticle:true,refreshRetainsAssociation:true,refreshRetainsUnsavedText:true,conflictRetainsText:true,saveAsNew:true,detachPreservesBody:true,searchRenameDelete:true,mobileOverflow:false,pageErrors:errors,temporaryDatabase:true,paidRequests:0};await writeFile(join(out,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
-}finally{if(browser)await browser.close();if(server){server.closeAllConnections();await new Promise(r=>server.close(r));}if(app)await app.close();await rm(dir,{recursive:true,force:true});}
+}finally{if(frontend)await frontend.close();if(browser)await browser.close();if(server){server.closeAllConnections();await new Promise(r=>server.close(r));}if(app)await app.close();await rm(dir,{recursive:true,force:true});}

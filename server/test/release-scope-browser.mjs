@@ -24,18 +24,23 @@ try{
   try{
    const page=await context.newPage();page.setDefaultTimeout(12000);await page.setViewport({width:1440,height:1000});
    page.on('pageerror',error=>errors.push(error.message));
-   page.on('request',request=>{if(/^\/api\/(discovery|topics)(\/|$)/.test(new URL(request.url()).pathname))phaseTwoRequests.push(request.url());});
+   page.on('request',request=>{if(/^\/api\/(articles|discovery|topics)(\/|$)/.test(new URL(request.url()).pathname))phaseTwoRequests.push(request.url());});
    await page.goto(base,{waitUntil:'networkidle0'});
    if(role==='admin'){await page.evaluate(auth=>{localStorage.setItem('auth_token',auth.token);localStorage.setItem('auth_user',JSON.stringify(auth.user));localStorage.setItem('dev_identity_role','admin');},auth);await page.reload({waitUntil:'networkidle0'});}
    const check=async()=>{
-    assert.equal(await page.$('a[href="/discovery"],a[href^="/topics"]'),null);
-    assert.doesNotMatch(await page.$eval('body',body=>body.textContent),/爆文|我的选题|选题与灵感|发现 · 选题|会员平台|RedFox/);
+    for(const path of ['/articles','/discovery','/topics'])assert.ok(await page.$(`a[href="${path}"]`));
+    assert.equal(await page.$$eval('.wb-sidebar .wb-tag',tags=>tags.filter(tag=>tag.textContent==='后续实现').length),3);
+    assert.equal(await page.$('.rf-overview,.rf-articles,.articles-content,.article-save-trigger'),null);
    };
    await check();await page.screenshot({path:join(out,role+'-desktop.png')});
-   for(const path of ['/discovery','/topics','/topics/old-topic']){
-    await page.goto(base+path,{waitUntil:'networkidle0'});await page.waitForFunction(()=>location.pathname==='/');await page.waitForSelector('textarea[aria-label="Markdown 正文"]');await check();
+   for(const path of ['/articles','/discovery','/topics','/topics/old-topic']){
+    await page.goto(base+path,{waitUntil:'networkidle0'});await page.waitForSelector('.wb-planned-status');assert.equal(new URL(page.url()).pathname,path);await check();
+    assert.match(await page.$eval('.wb-planned',element=>element.textContent),/后续实现/);
+    if(path==='/articles')await page.screenshot({path:join(out,role+'-articles-planned.png')});
    }
-   await page.goto(base+(role==='admin'?'/account':'/login'),{waitUntil:'networkidle0'});await check();
+   await page.goto(base+(role==='admin'?'/account':'/login'),{waitUntil:'networkidle0'});
+   if(role==='admin')await check();
+   assert.match(await page.$eval('body',element=>element.textContent),/后续开放|后续实现/);
    if(role==='admin')assert.ok(await page.$('a[href="/articles"]'));
    await page.setViewport({width:390,height:900});await page.goto(base,{waitUntil:'networkidle0'});
    await page.evaluate(()=>[...document.querySelectorAll('button')].find(button=>button.textContent.trim()==='导航')?.click());await check();
@@ -44,7 +49,7 @@ try{
   }finally{await context.close();}
  }
  assert.deepEqual(errors,[]);assert.deepEqual(phaseTwoRequests,[]);
- const report={productionBuild:true,guestAndAdmin:true,desktopAndMobile:true,noPhaseTwoNavigation:true,directRoutesRedirected:true,loginAndAccountCopy:true,automaticPhaseTwoRequests:0,pageErrors:errors,temporaryDatabase:true,paidRequests:0};
+ const report={productionBuild:true,guestAndAdmin:true,desktopAndMobile:true,plannedNavigationVisible:true,plannedRoutesVisible:true,articleManagementDeferred:true,loginAndAccountCopy:true,automaticDeferredRequests:0,pageErrors:errors,temporaryDatabase:true,paidRequests:0};
  await writeFile(join(out,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }finally{
  if(browser)await browser.close();if(server){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}if(app)await app.close();await rm(dir,{recursive:true,force:true});
