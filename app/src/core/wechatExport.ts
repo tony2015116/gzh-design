@@ -39,6 +39,12 @@ const toHexColor = (color: string) => {
 
 export const createWechatCopyRoot = (element: HTMLElement): HTMLElement => {
   const copyRoot = element.cloneNode(true) as HTMLElement;
+  copyRoot.querySelectorAll<HTMLElement>('img[src], a[href]').forEach(node => {
+    const attribute = node.tagName === 'IMG' ? 'src' : 'href';
+    const value = node.getAttribute(attribute);
+    if (!value || value.startsWith('#')) return;
+    try { node.setAttribute(attribute, new URL(value, element.baseURI).href); } catch { /* Keep invalid sources visible for the compatibility check. */ }
+  });
   const sourceScrollCards = Array.from(
     element.querySelectorAll<HTMLElement>('[data-scroll-card]'),
   );
@@ -317,8 +323,59 @@ export const buildWechatCopyRoot = (element: HTMLElement): { root: HTMLElement; 
   const articleStyle = pickArticleStyle(rootStyle, cssVariables);
   const html = toWechatCompatibleHtml(`<section style="${articleStyle.replace(/"/g, '&quot;')}">${copyRoot.innerHTML}</section>`, { cssVariables });
   copyRoot.innerHTML = html;
-  return { root: copyRoot, issues: validateWechatHtml(html) };
+  const issues = validateWechatHtml(html);
+  const localImages = [...copyRoot.querySelectorAll<HTMLImageElement>('img')].filter(image => {
+    try {
+      const url = new URL(image.src);
+      return ['blob:', 'file:'].includes(url.protocol)
+        || ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+        || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(url.hostname);
+    } catch { return true; }
+  });
+  if (localImages.length) issues.push({
+    level: 'warning', rule: 'local-image-source',
+    message: `有${localImages.length}张图片使用本机或临时地址，粘贴到其他平台后可能无法访问，请先上传可访问的图床。`,
+  });
+  const failedImages = [...element.querySelectorAll<HTMLImageElement>('img')]
+    .filter(image => image.hasAttribute('src') && image.complete && image.naturalWidth === 0);
+  if (failedImages.length) issues.push({
+    level: 'warning', rule: 'failed-image-source',
+    message: `预览中有${failedImages.length}张图片加载失败，请检查图片链接或重新上传后再粘贴。`,
+  });
+  return { root: copyRoot, issues };
 };
+
+/** Read rendered text without writing to the operating-system clipboard. */
+export function getWechatPlainText(root: HTMLElement): string {
+  const host = document.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  Object.assign(host.style, { position: 'fixed', left: '-10000px', top: '0', width: '677px', opacity: '0', pointerEvents: 'none' });
+  const content = root.cloneNode(true) as HTMLElement;
+  content.removeAttribute('id');
+  Object.assign(content.style, { position: 'static', opacity: '1', visibility: 'visible' });
+  host.append(content);
+  document.body.append(host);
+  try { return content.innerText; } finally { host.remove(); }
+}
+
+export type WechatCopyMethod = 'selection' | 'html' | 'text' | 'failed';
+export async function copyWechatArticle(root: HTMLElement): Promise<WechatCopyMethod> {
+  if (copyWechatHtmlBySelection(root)) return 'selection';
+  const plain = getWechatPlainText(root);
+  if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([root.innerHTML], { type: 'text/html' }),
+        'text/plain': new Blob([plain], { type: 'text/plain' }),
+      })]);
+      return 'html';
+    } catch { /* Use an explicitly labelled plain-text fallback. */ }
+  }
+  try {
+    await navigator.clipboard.writeText(plain);
+    return 'text';
+  } catch { return 'failed'; }
+}
 
 /** 用选区 + execCommand 复制：浏览器会按渲染结果生成富文本，公众号粘贴最稳 */
 export const copyWechatHtmlBySelection = (copyRoot: HTMLElement) => {

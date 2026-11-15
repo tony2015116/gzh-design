@@ -1,4 +1,5 @@
 import { getCurrentUser, type User } from './authService';
+import { isLocalOssDevelopment } from './localDevelopment';
 
 export type ControlMode = 'mock' | 'real' | 'off';
 export type DevIdentityRole = 'guest' | User['role'];
@@ -63,7 +64,7 @@ export function shouldShowDevIdentitySwitcher(): boolean {
 }
 
 export function usesRealAuth(): boolean {
-  return getAuthMode() === 'real';
+  return getAuthMode() === 'real' || isLocalOssDevelopment();
 }
 
 function createMockUser(role: DevIdentityRole): User | null {
@@ -82,7 +83,7 @@ function resolveUser(mode: ControlMode, realUser: User | null, devRole: DevIdent
   }
 
   if (mode === 'mock') {
-    return createMockUser(devRole);
+    return realUser || createMockUser(devRole);
   }
 
   return realUser;
@@ -95,52 +96,12 @@ export function getEffectiveUser(
   return resolveUser(getAuthMode(), realUser, devRole);
 }
 
-export function getAiTypesetAccess(
-  realUser: User | null,
-  devRole: DevIdentityRole = loadDevIdentityRole(),
-): FeatureAccess {
-  const user = resolveUser(getAccessMode(), realUser, devRole);
-
-  if (!user) {
-    return {
-      allowed: false,
-      reason: 'login_required',
-      message: 'AI 排版需要先登录。',
-    };
-  }
-
-  return {
-    allowed: true,
-    reason: 'ok',
-    message: '',
-  };
+// 个人API由用户自行配置和承担调用费用，与站点登录和会员身份无关。
+// 平台API权益未来单独实现，不能复用这里的放行规则。
+export function getAiTypesetAccess(): FeatureAccess {
+  return { allowed: true, reason: 'ok', message: '' };
 }
 
-export function getIllustrationAccess(
-  realUser: User | null,
-  devRole: DevIdentityRole = loadDevIdentityRole(),
-): FeatureAccess {
-  const user = resolveUser(getAccessMode(), realUser, devRole);
-
-  if (!user) {
-    return {
-      allowed: false,
-      reason: 'login_required',
-      message: '智能配图需要先登录。',
-    };
-  }
-
-  if (user.role === 'free') {
-    return {
-      allowed: false,
-      reason: 'vip_required',
-      message: '智能配图仅对 VIP 用户开放。',
-    };
-  }
-
-  return {
-    allowed: true,
-    reason: 'ok',
-    message: '',
-  };
+export function getIllustrationAccess(): FeatureAccess {
+  return { allowed: true, reason: 'ok', message: '' };
 }

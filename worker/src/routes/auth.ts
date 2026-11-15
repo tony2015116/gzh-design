@@ -10,15 +10,16 @@ import {
   requireAuthenticatedUser,
   validatePasswordStrength,
   verifyPassword,
+  loginAttemptSubject,
 } from '../lib/auth';
 import { getBearerToken, jsonResponse } from '../lib/http';
 
 export async function handleRegister(request: Request, env: Env, cors: Record<string, string>): Promise<Response> {
   const body: any = await request.json().catch(() => ({}));
   const email = normalizeEmail(String(body?.email || ''));
-  const { password } = body;
+  const password = body?.password;
 
-  if (!email || !password) {
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || typeof password !== 'string') {
     return jsonResponse({ error: '邮箱或密码无效' }, 400, cors);
   }
 
@@ -50,7 +51,7 @@ export async function handleRegister(request: Request, env: Env, cors: Record<st
       return jsonResponse({ error: '该邮箱已被注册' }, 409, cors);
     }
 
-    return jsonResponse({ error: '注册失败', details: error.message }, 500, cors);
+    return jsonResponse({ error: '注册失败，请稍后重试' }, 500, cors);
   }
 }
 
@@ -58,8 +59,10 @@ export async function handleLogin(request: Request, env: Env, cors: Record<strin
   const body: any = await request.json().catch(() => ({}));
   const email = normalizeEmail(String(body?.email || ''));
   const password = String(body?.password || '');
+  if(email.length>254||password.length>1024)return jsonResponse({error:'邮箱或密码长度无效'},400,cors);
+  const subject = loginAttemptSubject(request,env,email);
 
-  if (await isLoginRateLimited(env, email)) {
+  if (await isLoginRateLimited(env, subject)) {
     return jsonResponse({ error: '登录失败次数过多，请 10 分钟后再试' }, 429, cors);
   }
 
@@ -72,7 +75,7 @@ export async function handleLogin(request: Request, env: Env, cors: Record<strin
     : { ok: false, needsRehash: false };
 
   if (!user || !verification.ok) {
-    await recordLoginFailure(env, email);
+    await recordLoginFailure(env, subject);
     return jsonResponse({ error: '邮箱或密码错误' }, 401, cors);
   }
 
@@ -83,7 +86,7 @@ export async function handleLogin(request: Request, env: Env, cors: Record<strin
       .run();
   }
 
-  await clearLoginAttempts(env, email);
+  await clearLoginAttempts(env, subject);
   await env.DB.prepare(`DELETE FROM sessions WHERE expires_at <= datetime('now')`).run();
 
   const token = generateSessionToken();
@@ -117,6 +120,7 @@ export async function handleChangePassword(request: Request, env: Env, cors: Rec
   const body: any = await request.json().catch(() => ({}));
   const oldPassword = String(body?.oldPassword || '');
   const newPassword = String(body?.newPassword || '');
+  if(oldPassword.length>1024||newPassword.length>128)return jsonResponse({error:'密码长度无效'},400,cors);
 
   if (!oldPassword || !newPassword) {
     return jsonResponse({ error: '缺少旧密码或新密码' }, 400, cors);

@@ -5,6 +5,8 @@ import { logFormatEvent } from '../lib/logging';
 import { exchangeCodeForToken, feishuGet, getValidAccessToken, resolveFeishuCredentials, saveFeishuAppCredentials, FeishuAuthError } from '../lib/feishuAuth';
 import type { FeishuCredentials } from '../lib/feishuAuth';
 import { convertFeishuDocToMarkdown, parseFeishuDocUrl } from '../lib/feishuDocx';
+import {validFeishuRedirect,issueFeishuState,consumeFeishuState} from '../lib/feishuState';
+import {decryptSecret,SecretVaultError} from '../lib/secretVault';
 
 const API_BASE = 'https://open.feishu.cn/open-apis';
 const MAX_IMAGES = 20;
@@ -24,15 +26,16 @@ const feishuErrorResponse = (
   err: any,
   cors: Record<string, string>,
 ): Response => {
+  if (err instanceof SecretVaultError) return jsonResponse({error:err.message},503,cors);
   if (err instanceof FeishuAuthError) {
-    logFormatEvent(env, traceId, 'feishu.api.failed', { feature, code: err.code, details: err.details });
+    logFormatEvent(env, traceId, 'feishu.api.failed', { feature, code: err.code });
     if (err.code === 401 || err.code === 99991663 || err.code === 99991661) {
       return jsonResponse({ error: '飞书授权已失效，请重新绑定', needRebind: true }, 401, cors);
     }
-    return jsonResponse({ error: err.message }, 502, cors);
+    return jsonResponse({ error: '飞书请求失败，请检查授权和应用配置' }, 502, cors);
   }
-  logFormatEvent(env, traceId, 'worker.exception', { feature, message: err?.message || 'unknown' });
-  return jsonResponse({ error: '飞书功能暂时不可用', message: err?.message || 'unknown' }, 500, cors);
+  logFormatEvent(env, traceId, 'worker.exception', { feature, message: 'unexpected_feishu_error' });
+  return jsonResponse({ error: '飞书功能暂时不可用' }, 500, cors);
 };
 
 /** 仅登录校验（状态/配置类接口用，不要求已配置凭证） */
@@ -65,11 +68,9 @@ const withFeishuAuth = (
     if (!user) {
       return jsonResponse({ error: '飞书功能需要先登录' }, 401, cors);
     }
-    const creds = await resolveFeishuCredentials(env, user.id);
-    if (!creds) {
-      return jsonResponse({ error: '请先配置你的飞书应用凭证（App ID / Secret）' }, 400, cors);
-    }
     try {
+      const creds = await resolveFeishuCredentials(env, user.id);
+      if (!creds) return jsonResponse({ error: '请先配置你的飞书应用凭证（App ID / Secret）' }, 400, cors);
       return await handler(request, env, cors, user.id, creds);
     } catch (err: any) {
       return feishuErrorResponse(env, traceId, feature, err, cors);
@@ -81,11 +82,11 @@ const withFeishuAuth = (
 export const handleFeishuOauthUrl = withFeishuAuth('oauth-url', async (request, env, cors, userId, creds) => {
   const url = new URL(request.url);
   const redirectUri = url.searchParams.get('redirectUri') || '';
-  if (!/^https?:\/\//.test(redirectUri)) {
+  if (!validFeishuRedirect(request,env,redirectUri)) {
     return jsonResponse({ error: '缺少合法的 redirectUri' }, 400, cors);
   }
 
-  const state = `${userId}.${crypto.randomUUID()}`;
+  const state = await issueFeishuState(request,env,userId,creds.appId,redirectUri);
   const authorizeUrl =
     `https://accounts.feishu.cn/open-apis/authen/v1/authorize` +
     `?client_id=${encodeURIComponent(creds.appId)}` +
@@ -105,7 +106,7 @@ export const handleFeishuOauthCallback = withFeishuAuth('oauth-callback', async 
   if (!code || !redirectUri) {
     return jsonResponse({ error: '缺少 code 或 redirectUri' }, 400, cors);
   }
-  if (!state.startsWith(`${userId}.`)) {
+  if (!(await consumeFeishuState(request,env,userId,creds.appId,state,redirectUri))) {
     return jsonResponse({ error: 'state 校验失败，请重新发起绑定' }, 403, cors);
   }
 
@@ -139,11 +140,12 @@ export const handleFeishuAppConfigGet = withFeishuLogin('app-config-get', async 
   const row = await env.DB.prepare('SELECT app_id, app_secret FROM feishu_apps WHERE user_id = ?')
     .bind(userId)
     .first<{ app_id: string; app_secret: string }>();
+  const secret = row?.app_secret ? await decryptSecret(env,row.app_secret,`${userId}:app_secret`) : '';
   return jsonResponse(
     {
       configured: Boolean(row),
       appId: row?.app_id || '',
-      secretPreview: row?.app_secret ? `****${row.app_secret.slice(-4)}` : '',
+      secretPreview: secret ? `****${secret.slice(-4)}` : '',
     },
     200,
     cors,
@@ -156,8 +158,8 @@ export const handleFeishuAppConfigSave = withFeishuLogin('app-config-save', asyn
   const appId = typeof body?.appId === 'string' ? body.appId.trim() : '';
   const appSecret = typeof body?.appSecret === 'string' ? body.appSecret.trim() : '';
 
-  if (!appId) {
-    return jsonResponse({ error: '缺少 App ID' }, 400, cors);
+  if (!appId || appId.length > 200 || appSecret.length > 4096) {
+    return jsonResponse({ error: 'App ID 或 App Secret 长度无效' }, 400, cors);
   }
 
   if (appSecret) {
@@ -169,15 +171,15 @@ export const handleFeishuAppConfigSave = withFeishuLogin('app-config-save', asyn
     if (!existing) {
       return jsonResponse({ error: '首次配置必须填写 App Secret' }, 400, cors);
     }
-    await saveFeishuAppCredentials(env, userId, appId, existing.app_secret);
+    await saveFeishuAppCredentials(env, userId, appId, await decryptSecret(env,existing.app_secret,`${userId}:app_secret`));
   }
 
   return jsonResponse({ ok: true }, 200, cors);
 });
 
 /** 解绑 */
-export const handleFeishuDisconnect = withFeishuAuth('disconnect', async (_request, env, cors, userId, creds) => {
-  await env.DB.prepare('DELETE FROM feishu_tokens WHERE user_id = ?').bind(userId).run();
+export const handleFeishuDisconnect = withFeishuLogin('disconnect', async (_request, env, cors, userId) => {
+  await env.DB.batch([env.DB.prepare('DELETE FROM feishu_tokens WHERE user_id = ?').bind(userId),env.DB.prepare('DELETE FROM feishu_oauth_states WHERE user_id = ?').bind(userId)]);
   return jsonResponse({ ok: true }, 200, cors);
 });
 

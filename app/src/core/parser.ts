@@ -3,12 +3,17 @@ import type { BlockComponent } from './types';
 import type { Theme } from './theme';
 import type { LayoutStyle } from './style';
 import type { EmphasisConfig } from './emphasis';
+import {sanitizeArticleHtml,safeImageUrl} from './safeHtml.ts';
 
 const md = new MarkdownIt({
   html: true,
   breaks: true,
   linkify: true,
 });
+const renderInline = md.renderInline.bind(md);
+const renderBlock = md.render.bind(md);
+md.renderInline = (source, env) => sanitizeArticleHtml(renderInline(source, env));
+md.render = (source, env) => sanitizeArticleHtml(renderBlock(source, env));
 
 // CommonMark 的 flanking 规则以“空格分词”为前提：`**风景。**你好` 中闭合的 `**`
 // 前面是标点、后面是汉字，会被判定为不能闭合，导致加粗失效。
@@ -106,9 +111,10 @@ md.renderer.rules.code_inline = (tokens, idx, _options, env, _self) => {
   return `<code style="background: #efefef; color: ${primary}; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 13px; margin: 0 2px;">${content}</code>`;
 };
 
-md.renderer.rules.link_open = (_tokens, _idx, _options, env, _self) => {
+md.renderer.rules.link_open = (tokens, idx, _options, env, _self) => {
   const primary = env.theme?.primary || '#059669';
-  return `<a style="color: ${primary}; text-decoration: none; border-bottom: 1px dashed ${primary}; outline: none; cursor: default;">`;
+  const href = md.utils.escapeHtml(tokens[idx].attrGet('href') || '');
+  return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color: ${primary}; text-decoration: none; border-bottom: 1px dashed ${primary}; outline: none; cursor: pointer;">`;
 };
 md.renderer.rules.link_close = () => {
   return `</a>`;
@@ -226,7 +232,7 @@ function extractMarkdownImages(content: string, env: ParserEnv) {
     token.children?.forEach((child) => {
       if (child.type !== 'image') return;
 
-      const src = child.attrGet('src') || '';
+      const src = safeImageUrl(child.attrGet('src') || '');
       if (!src) return;
 
       images.push({ src, alt: child.content || '长图' });
@@ -342,7 +348,7 @@ function parseCustomComponent(content: string, env: ParserEnv): BlockComponent |
       content: body ? renderInlineLines(body, env) : '',
       metadata: {
         name: renderAttr(rawAttrs, 'name', env),
-        avatar: readAttr(rawAttrs, 'avatar'),
+        avatar: safeImageUrl(readAttr(rawAttrs, 'avatar') || ''),
         // 不写 cta 用默认引导语；写 cta="" 表示不要这一行
         cta: ctaRaw === undefined ? undefined : md.renderInline(ctaRaw, env),
       },
@@ -491,7 +497,7 @@ export const parseMarkdownToJSON = (
       const imageTokens = contentToken.children?.filter(t => t.type === 'image') || [];
       if (imageTokens.length > 0) {
         const images = imageTokens.map(img => ({
-          src: img.attrGet('src') || '',
+          src: safeImageUrl(img.attrGet('src') || ''),
           alt: img.content || ''
         }));
         components.push({

@@ -21,7 +21,7 @@ const parseErrorResponse = async (response: Response, fallback: string): Promise
 };
 
 /** 上游可能返回 200 + HTML（地址配错时中正常的兜底页），这里给出可读的错误提示 */
-const parseJsonBody = async (response: Response): Promise<any> => {
+const parseJsonBody = async (response: Response): Promise<{choices?: Array<{message?: {content?: string}}>}> => {
   const text = await response.text();
   try {
     return JSON.parse(text);
@@ -84,7 +84,7 @@ const readCompletionContent = async (response: Response): Promise<string> => {
 };
 
 /**
- * OSS 模式下调用 OpenAI 兼容 chat/completions，返回 message content。
+ * 使用个人API调用 OpenAI 兼容 chat/completions，返回 message content。
  * 开发环境走 vite dev server 的同源代理 /__ai-proxy（部分第三方中转没有
  * CORS 头，浏览器直连会被拦截）；生产构建只能直连，要求中转支持跨域。
  */

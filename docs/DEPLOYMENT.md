@@ -1,5 +1,9 @@
 # 部署文档
 
+当前部署入口：[下载项目并在本机运行](LOCAL_DEPLOYMENT.md)、[Ubuntu公网完整部署](SELF_HOSTED.md)。服务器统一使用gzh用户、`/home/gzh/gongzhonghao`目录和3100端口。下文Cloudflare内容仅作历史参考，不能与当前Node部署步骤混用。
+
+当前采用自有Linux服务器部署，用户 `gzh`，项目目录 `/home/gzh/gongzhonghao`，Node单实例运行。请使用 [完整自托管部署方案](SELF_HOSTED.md)。下文保留原Cloudflare历史方案。
+
 本文档描述如何把「公众号 Markdown 排版系统」从零部署到线上。
 
 目标架构：

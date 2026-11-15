@@ -1,6 +1,3 @@
-import { getAuthMode } from '../services/accessControl';
-import { getAuthToken } from '../services/authService';
-import { loadR2Config } from '../services/imageUpload';
 import { ossChatCompletion, resolveChatEndpoint } from './chatCompletion';
 import { COVER_COLORS } from '../components/ui/CoverTemplate';
 import type { CoverTemplateId } from '../components/ui/CoverTemplate';
@@ -66,52 +63,15 @@ export const parseCoverCopy = (content: string): CoverCopyProposal[] => {
 
 /**
  * Generate Xiaohongshu cover copy proposals from the article markdown.
- * online 模式走 Worker /api/cover-copy（需登录），OSS 模式浏览器直连（dev 走同源代理）。
+ * 所有部署模式均使用个人API，浏览器直连；开发环境走同源代理。
  */
 export const generateCoverCopy = async (markdown: string): Promise<CoverCopyProposal[]> => {
   if (!markdown.trim()) {
     throw new Error('正文为空，无法生成封面方案。');
   }
 
-  const isOnlineMode = import.meta.env.VITE_APP_MODE === 'online';
   const baseUrl = localStorage.getItem('openai_api_base') || '';
   const model = localStorage.getItem('openai_model') || '';
-
-  if (isOnlineMode) {
-    const r2Config = loadR2Config();
-    const workerUrl = r2Config?.workerUrl || '';
-    const secret = r2Config?.uploadSecret;
-    const authMode = getAuthMode();
-    const authToken = getAuthToken();
-    const bearerToken = authMode === 'real' ? authToken : authToken || secret;
-
-    if (!workerUrl) {
-      throw new Error('未配置 后端地址，请先在在线模式配置可用的后端地址。');
-    }
-
-    const response = await fetch(`${workerUrl.replace(/\/$/, '')}/api/cover-copy`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
-      },
-      // 上游地址与模型由 Worker 端配置决定，不再从前端传入
-      body: JSON.stringify({ markdown }),
-    });
-
-    if (!response.ok) {
-      const errTxt = await response.text().catch(() => '');
-      let errObj: any = {};
-      try {
-        errObj = JSON.parse(errTxt);
-      } catch { /* 忽略解析失败，使用兜底错误信息 */ }
-      const errMsg = errObj.error || `云端 AI 接口请求失败 (Status: ${response.status})`;
-      throw new Error(errMsg);
-    }
-
-    const data = await response.json();
-    return parseCoverCopy(data?.choices?.[0]?.message?.content || '');
-  }
 
   const apiKey = localStorage.getItem('openai_api_key') || '';
   if (!apiKey) {

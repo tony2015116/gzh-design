@@ -1,4 +1,5 @@
 import type { Env } from '../types';
+import {encryptSecret,decryptSecret} from './secretVault';
 
 // 飞书 OAuth user_access_token 管理：授权码换 token、过期自动刷新。
 // 端点以飞书开放平台「身份验证 v2」文档为准。
@@ -20,7 +21,7 @@ export const resolveFeishuCredentials = async (env: Env, userId: string): Promis
     .bind(userId)
     .first<{ app_id: string; app_secret: string }>();
   if (row?.app_id && row?.app_secret) {
-    return { appId: row.app_id, appSecret: row.app_secret };
+    return { appId: row.app_id, appSecret: await decryptSecret(env,row.app_secret,`${userId}:app_secret`) };
   }
   if (env.FEISHU_APP_ID && env.FEISHU_APP_SECRET) {
     return { appId: env.FEISHU_APP_ID, appSecret: env.FEISHU_APP_SECRET };
@@ -35,11 +36,14 @@ export const saveFeishuAppCredentials = async (
   appId: string,
   appSecret: string,
 ): Promise<void> => {
-  const existing = await env.DB.prepare('SELECT app_id FROM feishu_apps WHERE user_id = ?')
+  const existing = await env.DB.prepare('SELECT app_id,app_secret FROM feishu_apps WHERE user_id = ?')
     .bind(userId)
-    .first<{ app_id: string }>();
+    .first<{ app_id: string;app_secret:string }>();
 
-  await env.DB.prepare(
+  const encrypted = await encryptSecret(env,appSecret,`${userId}:app_secret`);
+  const changed = existing && (existing.app_id !== appId || await decryptSecret(env,existing.app_secret,`${userId}:app_secret`) !== appSecret);
+
+  const writes = [env.DB.prepare(
     `INSERT INTO feishu_apps (user_id, app_id, app_secret, updated_at)
      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
      ON CONFLICT(user_id) DO UPDATE SET
@@ -47,13 +51,14 @@ export const saveFeishuAppCredentials = async (
        app_secret = excluded.app_secret,
        updated_at = CURRENT_TIMESTAMP`,
   )
-    .bind(userId, appId, appSecret)
-    .run();
+    .bind(userId, appId, encrypted)];
 
   // 换了应用后，旧应用签发的 token 必然失效，直接作废要求重新绑定
-  if (existing && existing.app_id !== appId) {
-    await env.DB.prepare('DELETE FROM feishu_tokens WHERE user_id = ?').bind(userId).run();
+  if (changed) {
+    writes.push(env.DB.prepare('DELETE FROM feishu_tokens WHERE user_id = ?').bind(userId));
+    writes.push(env.DB.prepare('DELETE FROM feishu_oauth_states WHERE user_id = ?').bind(userId));
   }
+  await env.DB.batch(writes);
 };
 
 export class FeishuAuthError extends Error {
@@ -72,13 +77,14 @@ const postToken = async (body: Record<string, string>): Promise<any> => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20000),
   });
   const data: any = await response.json().catch(() => null);
   if (!response.ok || !data || (data.code !== undefined && data.code !== 0)) {
     throw new FeishuAuthError(
       data?.error_description || data?.msg || `飞书 token 接口请求失败 (Status: ${response.status})`,
       data?.code ?? response.status,
-      JSON.stringify(data ?? {}).slice(0, 300),
+      '',
     );
   }
   return data;
@@ -104,7 +110,7 @@ export const exchangeCodeForToken = async (
   const refreshToken = data.refresh_token ?? data.data?.refresh_token;
   const expiresIn = data.expires_in ?? data.data?.expires_in ?? 7200;
   if (!accessToken || !refreshToken) {
-    throw new FeishuAuthError('飞书 token 接口返回缺少 access_token/refresh_token', -1, JSON.stringify(data).slice(0, 300));
+    throw new FeishuAuthError('飞书 token 接口返回缺少 access_token/refresh_token');
   }
 
   const feishuUserName = data.name ?? data.data?.name ?? '';
@@ -120,7 +126,7 @@ export const exchangeCodeForToken = async (
        feishu_user_name = excluded.feishu_user_name,
        updated_at = CURRENT_TIMESTAMP`,
   )
-    .bind(userId, accessToken, refreshToken, expiresAt, feishuUserName)
+    .bind(userId, await encryptSecret(env,accessToken,`${userId}:access_token`), await encryptSecret(env,refreshToken,`${userId}:refresh_token`), expiresAt, feishuUserName)
     .run();
 
   return { feishuUserName };
@@ -138,27 +144,27 @@ export const getValidAccessToken = async (env: Env, creds: FeishuCredentials, us
 
   const refreshSkew = 5 * 60 * 1000;
   if (row.expires_at - refreshSkew > Date.now()) {
-    return row.access_token;
+    return decryptSecret(env,row.access_token,`${userId}:access_token`);
   }
 
   const data = await postToken({
     grant_type: 'refresh_token',
     client_id: creds.appId,
     client_secret: creds.appSecret,
-    refresh_token: row.refresh_token,
+    refresh_token: await decryptSecret(env,row.refresh_token,`${userId}:refresh_token`),
   });
 
   const accessToken = data.access_token ?? data.data?.access_token;
-  const refreshToken = data.refresh_token ?? data.data?.refresh_token ?? row.refresh_token;
+  const refreshToken = data.refresh_token ?? data.data?.refresh_token ?? await decryptSecret(env,row.refresh_token,`${userId}:refresh_token`);
   const expiresIn = data.expires_in ?? data.data?.expires_in ?? 7200;
   if (!accessToken) {
-    throw new FeishuAuthError('飞书刷新 token 返回缺少 access_token', -1, JSON.stringify(data).slice(0, 300));
+    throw new FeishuAuthError('飞书刷新 token 返回缺少 access_token');
   }
 
   await env.DB.prepare(
     'UPDATE feishu_tokens SET access_token = ?, refresh_token = ?, expires_at = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
   )
-    .bind(accessToken, refreshToken, Date.now() + expiresIn * 1000, userId)
+    .bind(await encryptSecret(env,accessToken,`${userId}:access_token`), await encryptSecret(env,refreshToken,`${userId}:refresh_token`), Date.now() + expiresIn * 1000, userId)
     .run();
 
   return accessToken;

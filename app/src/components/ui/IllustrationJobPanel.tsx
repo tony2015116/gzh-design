@@ -17,7 +17,7 @@ function sourceLabel(source: IllustrationJob['source']): string {
     case 'hybrid':
       return '混合生成';
     case 'oss_placeholder':
-      return 'OSS 本地生成';
+      return '浏览器生成';
     case 'pending':
       return '后台处理中';
     case 'placeholder':

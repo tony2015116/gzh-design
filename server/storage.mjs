@@ -17,10 +17,11 @@ export function openDatabase(path) {
       return column && row ? row[column] : row;
     },
     async all() { return { success: true, results: sqlite.prepare(sql).all(...values) }; },
-    async run() {
+    execute() {
       const result = sqlite.prepare(sql).run(...values);
       return { success: true, meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } };
     },
+    async run() { return this.execute(); },
   });
   return {
     prepare,
@@ -29,7 +30,8 @@ export function openDatabase(path) {
       sqlite.exec('BEGIN IMMEDIATE');
       try {
         const results = [];
-        for (const statement of statements) results.push(await statement.run());
+        // DatabaseSync transactions must never yield to unrelated HTTP requests.
+        for (const statement of statements) results.push(statement.execute());
         sqlite.exec('COMMIT');
         return results;
       } catch (error) { sqlite.exec('ROLLBACK'); throw error; }

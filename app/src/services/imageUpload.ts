@@ -1,3 +1,5 @@
+import {isLocalOssDevelopment} from './localDevelopment';
+
 /**
  * Image Upload Service
  *
@@ -58,7 +60,7 @@ export function saveUploadMode(mode: UploadMode): void {
 // --- R2 Config ---
 export function loadR2Config(): R2Config | null {
   // Self-hosted builds always use this site's backend, including browsers with old CF settings.
-  if (import.meta.env.VITE_API_SAME_ORIGIN === 'true') {
+  if (import.meta.env.VITE_API_SAME_ORIGIN === 'true' || isLocalOssDevelopment()) {
     return { workerUrl: window.location.origin, uploadSecret: '' };
   }
   const raw = localStorage.getItem(R2_CONFIG_KEY) ?? localStorage.getItem(LEGACY_R2_CONFIG_KEY);
@@ -167,7 +169,8 @@ export async function uploadImageToR2(blob: Blob, config: R2Config): Promise<str
   formData.append('file', blob, `image-${Date.now()}.jpg`);
 
   const headers: Record<string, string> = {};
-  const authToken = import.meta.env.VITE_API_SAME_ORIGIN === 'true' ? localStorage.getItem('auth_token') : null;
+  const sameOrigin = new URL(config.workerUrl, location.href).origin === location.origin;
+  const authToken = sameOrigin && (import.meta.env.VITE_API_SAME_ORIGIN === 'true' || isLocalOssDevelopment()) ? localStorage.getItem('auth_token') : null;
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;
   } else if (config.uploadSecret?.trim()) {
@@ -235,12 +238,12 @@ export async function uploadImageToCdn(blob: Blob, config: CdnConfig): Promise<s
  * Internal helpers
  * ============================================================ */
 
-function extractByPath(obj: any, path: string): string | null {
+function extractByPath(obj: unknown, path: string): string | null {
   const parts = path.split('.');
   let current = obj;
   for (const part of parts) {
     if (current == null || typeof current !== 'object') return null;
-    current = current[part];
+    current = (current as Record<string, unknown>)[part];
   }
   return typeof current === 'string' ? current : null;
 }

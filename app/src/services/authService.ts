@@ -4,11 +4,14 @@
  */
 
 import { loadR2Config } from './imageUpload';
+import { isLocalOssDevelopment } from './localDevelopment';
+import {notifyDraftOwnerChanged} from './draftScope.ts';
 
 export interface User {
   id: string;
   email: string;
   role: 'free' | 'vip' | 'admin';
+  created_at?: string;
 }
 
 export interface Preset {
@@ -26,6 +29,7 @@ const USER_KEY = 'auth_user';
 
 /** Get the worker URL from saved config */
 function getWorkerUrl(): string {
+  if (isLocalOssDevelopment()) return location.origin;
   const r2Config = loadR2Config();
   return (r2Config?.workerUrl || '').replace(/\/$/, '');
 }
@@ -43,23 +47,27 @@ function authHeaders(): HeadersInit {
 function saveAuthState(token: string, user: User): void {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  notifyDraftOwnerChanged();
 }
 
-/** Clear auth state（先尝试通知服务端删除会话，失败也继续本地登出） */
+/** Clear local state immediately, then revoke the server session. */
 export async function logout(): Promise<void> {
   const workerUrl = getWorkerUrl();
+  const headers = authHeaders();
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  notifyDraftOwnerChanged();
+  if (isLocalOssDevelopment()) localStorage.setItem('dev_identity_role', 'guest');
   if (workerUrl) {
     try {
       await fetch(`${workerUrl}/api/auth/logout`, {
         method: 'POST',
-        headers: authHeaders(),
+        headers,
       });
     } catch {
       // 容错：网络或 Worker 异常不阻塞本地登出
     }
   }
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
 }
 
 /** Change the current user's password */
@@ -135,15 +143,16 @@ export async function login(email: string, password: string): Promise<User> {
 export async function refreshUser(): Promise<User | null> {
   const workerUrl = getWorkerUrl();
   if (!workerUrl || !isLoggedIn()) return null;
+  const requestedToken=getAuthToken();
 
   const res = await fetch(`${workerUrl}/api/user/info`, {
     headers: authHeaders(),
   });
-  if (!res.ok) {
-    logout();
-    return null;
-  }
+  if(getAuthToken()!==requestedToken)return getCurrentUser();
+  if (res.status === 401) { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY); notifyDraftOwnerChanged(); return null; }
+  if (!res.ok) throw new Error('暂时无法验证登录状态，请稍后重试');
   const data = await res.json();
+  if(getAuthToken()!==requestedToken)return getCurrentUser();
   if (data.user) {
     localStorage.setItem(USER_KEY, JSON.stringify(data.user));
   }

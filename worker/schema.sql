@@ -126,3 +126,14 @@ CREATE TABLE IF NOT EXISTS feishu_apps (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS feishu_oauth_states (
+  state_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  session_hash TEXT NOT NULL,
+  redirect_uri TEXT NOT NULL,
+  app_id TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_feishu_oauth_expiry ON feishu_oauth_states(expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_feishu_oauth_session ON feishu_oauth_states(user_id,session_hash);

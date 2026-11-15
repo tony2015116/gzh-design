@@ -17,15 +17,15 @@
 完整说明见 [SKILL.md](SKILL.md)，这里是速览：
 
 1. **读文章、判断类型**：教程 / 清单盘点 / 评测对比 / 观点深度 / 心得故事 / 资讯快评。
-2. **定风格方案**：读 [references/style-schemes.md](references/style-schemes.md)，给用户首选 + 备选 + 反差款三个选项让他挑（用你环境里的问答方式；没有就在文本里列出编号让用户回复）。用户已指定或说"你决定"时跳过。
+2. **轻量沟通定风格**：读 [references/style-schemes.md](references/style-schemes.md)，按 [SKILL.md 第 2 步](SKILL.md#2-轻量沟通确定风格与偏好) 执行。首次偏好未知时推荐两种方案，简述差异，集中询问最多两个关键问题，允许用户补充颜色、装饰密度或参考；已有明确选择、对话偏好、项目偏好，或用户说“你决定 / 直接出整篇”时直接做，不重复询问。沉默不表示同意；等待时可检查素材和结构。明确要求先挑风格时，用相同片段输出实际局部预览再等反馈，普通“排版，我看看效果”默认整篇。只有用户明确要求保存默认时才写入项目 `.gzh-typesetter/style-preferences.json`，重新读取核对后报告；该文件仅供 Skill 使用，不是网站预设 JSON，具体字段与加载规则见 SKILL.md。
 3. **改写 Markdown**：按 [references/formatting-rules.md](references/formatting-rules.md) 的规则和配方表、[references/typesetting-syntax.md](references/typesetting-syntax.md) 的语法，自己改写（不要再调外部模型）。写到新文件，不覆盖原文。
 4. **渲染**：
    ```bash
    node <skill 目录>/scripts/typeset.mjs --input <改写后.md> --scheme <方案> --title "<标题>" --out <产物.html>
    ```
    `--list-schemes` 看所有方案；`--layout` / `--theme` 单独换版式或主题色；`--scheme-file` 读网站导出的自定义预设。
-5. **看校验**：退出码 0 = 可交付（WARNING 酌情告知用户）；退出码 2 = 有 ERROR，多半是 Markdown 里手写了 HTML，改掉再渲染。规则见 [references/wechat-compat.md](references/wechat-compat.md)。
-6. **交付**：方案 + 理由、做了哪些排版处理（3–5 条）、产物绝对路径和"打开后点复制到公众号"。
+5. **看校验与真实渲染**：退出码 0 = 兼容校验无 ERROR（WARNING 酌情告知用户）；退出码 2 = 有 ERROR，多半是 Markdown 里手写了 HTML，改掉再渲染。再检查实际桌面和手机渲染，发现问题先修复；无法查看或素材失效时如实说明，不能把兼容校验当作视觉验证。规则见 [references/wechat-compat.md](references/wechat-compat.md)。
+6. **交付**：方案 + 理由、做了哪些排版处理（3–5 条）、产物绝对路径和"打开后点复制到公众号"。附 1–2 个具体反馈维度，如颜色是否抢眼、正文是否偏密或装饰是否偏多；完整交付后再邀请反馈，不额外设审批关卡。
 
 ## 铁律
 

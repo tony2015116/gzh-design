@@ -1,0 +1,30 @@
+import {createServer} from 'node:http';
+import {mkdtemp,mkdir,rm,writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import assert from 'node:assert/strict';
+import puppeteer from 'puppeteer-core';
+import {createApplication} from '../application.mjs';
+const root=resolve(import.meta.dirname,'../..'),out=join(root,'output/user-center'),dir=await mkdtemp(join(tmpdir(),'gzh-account-'));
+let app,server,browser,base;const errors=[];
+const start=async()=>{server=createServer((req,res)=>app.handle(req,res));await new Promise(r=>server.listen(0,'127.0.0.1',r));base=`http://127.0.0.1:${server.address().port}`;app=await createApplication({dataDir:dir,staticDir:join(root,'app/dist'),publicUrl:base,config:{}});};
+const stop=async()=>{if(server){await new Promise(r=>server.close(r));server=null;}if(app){await app.close();app=null;}};
+try{
+ await mkdir(out,{recursive:true});await start();
+ const request=async(path,body,token)=>{const r=await fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,data:await r.json()};};
+ const auth=(await request('/api/auth/register',{email:'account@example.test',password:'Original-test123'})).data;
+ const second=(await request('/api/auth/login',{email:'account@example.test',password:'Original-test123'})).data.token;
+ const stored=await app.db.prepare('SELECT email,role,password_hash FROM users WHERE id=?').bind(auth.user.id).first();assert.equal(stored.email,'account@example.test');assert.equal(stored.role,'free');assert.notEqual(stored.password_hash,'Original-test123');assert.ok(stored.password_hash.startsWith('pbkdf2'));
+ browser=await puppeteer.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});const page=await browser.newPage();page.on('pageerror',e=>errors.push(e.message));await page.setViewport({width:1440,height:1000});
+ await page.goto(base+'/',{waitUntil:'networkidle0'});assert.ok(await page.$('.wb-account-login'),'Sidebar needs a clear login button');
+ await page.evaluate(a=>{localStorage.setItem('auth_token',a.token);localStorage.setItem('auth_user',JSON.stringify(a.user));},auth);await page.reload({waitUntil:'networkidle0'});await page.waitForSelector('.wb-account-main');await page.click('.wb-account-main');await page.waitForFunction(()=>location.pathname==='/account');await page.waitForSelector('#account-current-password');
+ assert.match(await page.$eval('.account-profile',e=>e.textContent),/account@example.test/);await page.screenshot({path:join(out,'account-desktop.png')});
+ const fill=async(id,value)=>page.$eval(id,(e,v)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,v);e.dispatchEvent(new Event('input',{bubbles:true}));},value);
+ await fill('#account-current-password','wrong-password');await fill('#account-new-password','Changed-test456');await fill('#account-confirm-password','Changed-test456');await page.click('.account-password-submit');await page.waitForFunction(()=>document.body.textContent.includes('旧密码不正确'));
+ await fill('#account-current-password','Original-test123');await page.click('.account-password-submit');await page.waitForFunction(()=>document.body.textContent.includes('密码已更新'));
+ assert.equal((await request('/api/user/info',null,second)).status,401);assert.equal((await request('/api/user/info',null,auth.token)).status,200);
+ await page.reload({waitUntil:'networkidle0'});await page.waitForSelector('.account-profile');await page.setViewport({width:390,height:1000});await page.evaluate(()=>localStorage.setItem('gzh_ui_skin','dark'));await page.reload({waitUntil:'networkidle0'});await page.waitForSelector('.account-profile');await page.screenshot({path:join(out,'account-mobile-dark.png')});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ await page.click('main button[aria-label="退出登录"]');await page.waitForFunction(()=>location.pathname==='/login');await page.goto(base+'/account',{waitUntil:'networkidle0'});await page.waitForFunction(()=>location.pathname==='/login');
+ await stop();await start();assert.equal((await request('/api/auth/login',{email:'account@example.test',password:'Changed-test456'})).status,200);assert.equal((await request('/api/auth/login',{email:'account@example.test',password:'Original-test123'})).status,401);
+ assert.deepEqual(errors,[]);const report={sidebarLogin:true,accountEntry:true,profile:true,hashedPassword:true,passwordChanged:true,otherSessionsRevoked:true,currentSessionPreserved:true,guestRedirect:true,persistedAfterRestart:true,mobileOverflow:false,pageErrors:errors,temporaryDatabase:true};await writeFile(join(out,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+}finally{if(browser)await browser.close();await stop();await rm(dir,{recursive:true,force:true});}

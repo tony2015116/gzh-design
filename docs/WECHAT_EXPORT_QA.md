@@ -1,0 +1,34 @@
+# 公众号复制导出检查
+
+检查日期：2026-11-14。
+
+## 本轮修改
+
+- Markdown 引用链接保留目标地址；复制时把相对图片与链接地址转为绝对地址。
+- 预格式 HTML 保留空行与缩进，富文本剪贴板路径不再删除换行。
+- 统一网站与 Skill 源码中的复制流程：选区复制、富文本剪贴板、纯文本降级。纯文本降级和完全失败分别提示，不再把 HTML 源码作为正文复制并声称富文本成功。
+- 本机、临时图片地址及预览中已加载失败的图片在复制后提醒核对。仍在加载的图片不会提前判定失败；提醒不代表链接已被上传或修复。
+
+## 已验证
+
+- `cd server; npm test`：27项测试通过，包含预格式空白与链接目标回归。
+- `cd app; npm run build:server`：通过，保留既有主包超过500kB提示。
+- `wechatExport.ts`、`wechatCompat.ts`、`copyClient.ts` 定向ESLint通过。排版页原有lint问题未包含在这项结论中。
+- `node server/test/wechat-copy-browser.mjs`：隔离SQLite与Chrome验证标题、强调、引用、列表、表格、代码、图片地址、链接目标、纯文本降级、剪贴板拒绝及失败图片提醒。剪贴板API使用测试替身，只捕获应用自己的内容，未改写操作系统剪贴板。
+- 真实文章《我又花了上亿Token攒了一个设计skill，开源了。》导出文字与18张图片链接、顺序保留。677px与375px实际渲染截图已查看，手机无横向溢出，无页面运行异常。
+
+## 尚未通过的部分
+
+- 真实文章的18张飞书图片在独立浏览器中全部加载失败。来源是原稿里的链接；本轮未改写原文、替换图片或上传图床。图片显示验收仍待完成。
+- 尚未在真实微信公众号后台粘贴，不能据此承诺平台清洗后的样式、外链可点击性或图片转存效果。
+- 此次仅修改网站与共享源码，未重打包或发布Skill、未部署服务器、未推送GitHub。
+
+## 产物
+
+- `output/wechat-copy/article.html`：真实文章导出的本地HTML。
+- `output/wechat-copy/article-desktop-top.png`、`article-mobile-top.png`：原尺寸首屏截图。
+- `output/wechat-copy/article-desktop.png`、`article-mobile.png`：全文截图，含本次实际加载失败的图片状态。
+- `output/wechat-copy/clipboard.html`、`clipboard.txt`：合成测试文章捕获的富文本与纯文本。
+- `output/wechat-copy/report.json`：机器可读检查报告。
+
+测试只写入临时数据库，未调用收费RedFox或模型接口。测试浏览器和临时服务已关闭，保留原有5173开发服务。

@@ -127,6 +127,10 @@ export function toWechatCompatibleHtml(html: string, options: WechatCompatOption
       const parent = stack[stack.length - 1]?.name;
       if (parent === 'style' || parent === 'script') return;
       if (!token.text.trim()) {
+        if (stack.some(frame => frame.name === 'pre' || frame.name === 'code')) {
+          out.push(token.text);
+          return;
+        }
         // 块之间的换行缩进丢掉；行内的单个空格保留
         if (/\n/.test(token.text)) return;
         out.push(leafDepth() > 0 ? token.text : `<span leaf="">${token.text}</span>`);

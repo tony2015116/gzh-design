@@ -1,5 +1,6 @@
 import { getAuthToken } from './authService';
 import { loadR2Config } from './imageUpload';
+import { resolveChatEndpoint } from '../ai/chatCompletion';
 import {
   createOssIllustrationTraceId,
   getOssIllustrationLogPreview,
@@ -974,10 +975,7 @@ async function requestStructuredSpecFromLocalModel(
   if (!apiKey) return null;
   if (item.engine !== 'html_infographic') return null;
 
-  let endpoint = baseUrl;
-  if (!endpoint.endsWith('chat/completions')) {
-    endpoint = endpoint.endsWith('/') ? `${endpoint}chat/completions` : `${endpoint}/chat/completions`;
-  }
+  const endpoint = resolveChatEndpoint(baseUrl);
 
   const context = extractStructuredSectionContext(markdown, item);
   await logOssIllustrationEvent(traceId, 'structured_spec.request.started', {
@@ -1673,78 +1671,13 @@ async function createLocalIllustrationJob(request: IllustrationJobRequest): Prom
   };
 }
 
+// 个人API模式不调用平台配图接口；规划与渲染复用浏览器实现。
 export async function getIllustrationPlan(request: IllustrationPlanRequest): Promise<IllustrationPlan> {
-  const isOnlineMode = import.meta.env.VITE_APP_MODE === 'online';
-
-  if (!isOnlineMode) {
-    return buildLocalIllustrationPlan(request);
-  }
-
-  const workerUrl = getWorkerUrl();
-  if (!workerUrl) {
-    throw new Error('未配置 后端地址，无法请求在线配图建议。');
-  }
-
-  const token = getAuthToken();
-  const response = await fetch(`${workerUrl}/api/illustration/plan`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(request),
-  });
-
-  const text = await response.text();
-  let data: any = {};
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = {};
-  }
-
-  if (!response.ok) {
-    throw new Error(data.error || `智能配图建议请求失败 (${response.status})`);
-  }
-
-  return data.plan as IllustrationPlan;
+  return buildLocalIllustrationPlan(request);
 }
 
 export async function createIllustrationJob(request: IllustrationJobRequest): Promise<IllustrationJob> {
-  const isOnlineMode = import.meta.env.VITE_APP_MODE === 'online';
-
-  if (!isOnlineMode) {
-    return await createLocalIllustrationJob(request);
-  }
-
-  const workerUrl = getWorkerUrl();
-  if (!workerUrl) {
-    throw new Error('未配置 后端地址，无法创建在线配图任务。');
-  }
-
-  const token = getAuthToken();
-  const response = await fetch(`${workerUrl}/api/illustration/jobs`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(request),
-  });
-
-  const text = await response.text();
-  let data: any = {};
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = {};
-  }
-
-  if (!response.ok) {
-    throw new Error(data.error || `智能配图任务创建失败 (${response.status})`);
-  }
-
-  return data.job as IllustrationJob;
+  return await createLocalIllustrationJob(request);
 }
 
 export async function getIllustrationJob(jobId: string): Promise<IllustrationJob> {

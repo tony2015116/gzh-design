@@ -31,6 +31,10 @@ output
 
 # 自托管服务器持久化数据
 server/data/
+server/data-*/
+.credentials-key
+*.sqlite
+.gzh-typesetter/
 *.sqlite-wal
 *.sqlite-shm
 

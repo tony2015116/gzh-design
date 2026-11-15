@@ -23,6 +23,7 @@ export function jsonResponse(body: object, status: number, cors: Record<string, 
     status,
     headers: {
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
       ...cors,
     },
   });

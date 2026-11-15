@@ -69,9 +69,16 @@ export function normalizeEmail(email: string): string {
 }
 
 export function validatePasswordStrength(password: string): string | null {
+  if (password.length > 128) return '密码长度最多 128 位';
   if (password.length < 8) return '密码长度至少 8 位';
   if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) return '密码需同时包含字母和数字';
   return null;
+}
+
+export function loginAttemptSubject(request:Request,env:Env,email:string):string {
+  // Only the Node adapter may set this header; it discards client supplied copies.
+  if(env.RUNTIME==='node')return `${email}|${request.headers.get('X-Trusted-Client-IP')||'unknown'}`;
+  return `${email}|${request.headers.get('CF-Connecting-IP')||'unknown'}`;
 }
 
 type LoginAttemptRow = {

@@ -43,6 +43,7 @@ npm run build:online
 
 - In `oss` mode, users can configure the API key and model in the browser.
 - In `oss` mode, auth defaults to `mock`, and the local identity switcher for `guest / free / vip / admin` lives inside the settings panel.
+  - Local OSS development also supports real email registration and login through the built-in Node backend. Real sessions take precedence over debug identities; logout returns to the guest identity. Account requests use the local origin, independent of upload settings.
 - In `oss` mode, AI debug logs are printed to the terminal running `npm run dev:oss`.
 - In `oss` mode, smart illustration generation uses local structured SVG templates and rasterizes them to PNG before insertion, so the full confirm/apply flow stays testable without Worker secrets.
 - In `oss` mode, smart illustration assets are rasterized locally to PNG before insertion, and scene images fall back to infographic-style rendering when no real image model is available.

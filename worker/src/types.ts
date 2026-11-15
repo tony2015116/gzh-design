@@ -16,6 +16,7 @@ export interface Env {
   GEMINI_IMAGE_MODEL?: string;
   FEISHU_APP_ID?: string;
   FEISHU_APP_SECRET?: string;
+  CREDENTIALS_ENCRYPTION_KEY?: string;
   AI_FORMAT_AUTH_MODE?: string;
   AI_FORMAT_LOG_LEVEL?: string;
   AI_FORMAT_LOG_PREVIEW_CHARS?: string;

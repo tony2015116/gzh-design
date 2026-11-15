@@ -1,6 +1,3 @@
-import { getAuthMode } from '../services/accessControl';
-import { getAuthToken } from '../services/authService';
-import { loadR2Config } from '../services/imageUpload';
 import { ossChatCompletion, resolveChatEndpoint } from './chatCompletion';
 import { XHS_THEME_PACKS } from '../components/ui/XhsCard';
 import { XHS_STICKER_THEMES } from '../components/ui/XhsStickerCard';
@@ -332,49 +329,13 @@ export const parseXhsDeck = (content: string, markdown = ''): XhsDeck => {
 };
 
 // ---------------------------------------------------------------------------
-// 调用：online 走 Worker /api/xhs-cards，OSS 浏览器直连（dev 走同源代理）
+// 调用：个人API浏览器直连，开发环境走同源代理
 // ---------------------------------------------------------------------------
 
 // 一次调用 + 一次解析。解析失败/卡片过少时会由外层 generateXhsCards 再重试一次。
 const requestAndParse = async (markdown: string): Promise<XhsDeck> => {
-  const isOnlineMode = import.meta.env.VITE_APP_MODE === 'online';
   const baseUrl = localStorage.getItem('openai_api_base') || '';
   const model = localStorage.getItem('openai_model') || '';
-
-  if (isOnlineMode) {
-    const r2Config = loadR2Config();
-    const workerUrl = r2Config?.workerUrl || '';
-    const secret = r2Config?.uploadSecret;
-    const authMode = getAuthMode();
-    const authToken = getAuthToken();
-    const bearerToken = authMode === 'real' ? authToken : authToken || secret;
-
-    if (!workerUrl) {
-      throw new Error('未配置 后端地址，请先在在线模式配置可用的后端地址。');
-    }
-
-    const response = await fetch(`${workerUrl.replace(/\/$/, '')}/api/xhs-cards`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
-      },
-      // 上游地址与模型由 Worker 端配置决定，不再从前端传入
-      body: JSON.stringify({ markdown }),
-    });
-
-    if (!response.ok) {
-      const errTxt = await response.text().catch(() => '');
-      let errObj: any = {};
-      try {
-        errObj = JSON.parse(errTxt);
-      } catch { /* 忽略解析失败，使用兜底错误信息 */ }
-      throw new Error(errObj.error || `云端 AI 接口请求失败 (Status: ${response.status})`);
-    }
-
-    const data = await response.json();
-    return parseXhsDeck(data?.choices?.[0]?.message?.content || '', markdown);
-  }
 
   const apiKey = localStorage.getItem('openai_api_key') || '';
   if (!apiKey) {

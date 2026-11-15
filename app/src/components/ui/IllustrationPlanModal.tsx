@@ -158,7 +158,7 @@ export function IllustrationPlanModal({
 
         <div className="flex items-center justify-between border-t border-gray-100 bg-white px-6 py-4">
           <div className="text-sm text-gray-500">
-            当前版本已经支持结构化信息图；如 Worker 配置了图像模型，场景图会尝试真实生成。
+            当前使用浏览器生成信息图；配置个人 API 后会尝试整理配图内容，场景图暂回退为信息图。
           </div>
           <div className="flex items-center gap-3">
             <button
