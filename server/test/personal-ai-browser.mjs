@@ -23,9 +23,8 @@ try{
   try{
    let auth;
    if(role!=='guest'){
-    const response=await fetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:role+'@personal-ai.example.test',password:'Personal-test123'})});
-    auth=await response.json();assert.ok(auth.token);
-    if(role==='vip'){await app.db.prepare("UPDATE users SET role='vip' WHERE id=?").bind(auth.user.id).run();auth.user.role='vip';}
+    // Historical browser identity must not enable accounts in a public build.
+    auth={token:'old-test-token',user:{id:'old-'+role,email:role+'@personal-ai.example.test',role}};
    }
    const page=await context.newPage();page.setDefaultTimeout(15000);
    await page.setViewport({width:1440,height:1000});

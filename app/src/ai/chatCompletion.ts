@@ -6,6 +6,12 @@ export interface OssChatCompletionParams {
   systemPrompt: string;
   userContent: string;
   temperature: number;
+  signal?: AbortSignal;
+}
+
+export class ChatCompletionError extends Error {
+  status: number;
+  constructor(message: string, status: number) { super(message); this.status = status; }
 }
 
 const parseErrorResponse = async (response: Response, fallback: string): Promise<never> => {
@@ -17,7 +23,7 @@ const parseErrorResponse = async (response: Response, fallback: string): Promise
     else if (typeof data.error === 'string') errMsg = data.error;
     else if (data.message) errMsg = data.message;
   } catch { /* 响应体不是 JSON，走兜底错误提示 */ }
-  throw new Error(`${errMsg}\n详细信息: ${errTxt.slice(0, 200)}`);
+  throw new ChatCompletionError(`${errMsg}\n详细信息: ${errTxt.slice(0, 200)}`, response.status);
 };
 
 /** 上游可能返回 200 + HTML（地址配错时中正常的兜底页），这里给出可读的错误提示 */
@@ -95,6 +101,7 @@ export const ossChatCompletion = async ({
   systemPrompt,
   userContent,
   temperature,
+  signal,
 }: OssChatCompletionParams): Promise<string> => {
   const payload = {
     model,
@@ -110,6 +117,7 @@ export const ossChatCompletion = async ({
   if (import.meta.env.DEV) {
     const response = await fetch('/__ai-proxy', {
       method: 'POST',
+      signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         endpoint,
@@ -127,6 +135,7 @@ export const ossChatCompletion = async ({
 
   const response = await fetch(endpoint, {
     method: 'POST',
+    signal,
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,

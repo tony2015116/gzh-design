@@ -1,0 +1,2 @@
+.api-connection-feedback{font-size:12px;line-height:1.8;margin:9px 0 0;overflow-wrap:anywhere}.api-connection-feedback.is-success{color:#087750}.api-connection-feedback.is-error{color:#b43c32}.api-connection-feedback.is-testing{color:#637b6b}
+[data-app-skin="dark"] .api-connection-feedback.is-success{color:#88d5ae}[data-app-skin="dark"] .api-connection-feedback.is-error{color:#ffc1b6}[data-app-skin="dark"] .api-connection-feedback.is-testing{color:#a4baaa}

@@ -5,13 +5,14 @@ import {findArticleImages,replaceArticleImage,type ArticleImage} from './imageRe
 import {uploadArticleImage} from './imageUpload';
 import {safeImageUrl} from '../../core/safeHtml';
 import {getAuthToken} from '../../services/authService';
+import {accountsEnabled} from '../../services/releaseScope';
 import {getDraftOwner} from '../../services/draftScope';
 import './article-images.css';
 
 function ImageItem({image,onEdit,onUpload,busy}:{image:ArticleImage;onEdit:()=>void;onUpload:()=>void;busy:boolean}){
  const [status,setStatus]=useState<'loading'|'loaded'|'failed'>('loading'),[retry,setRetry]=useState(0);
  const src=safeImageUrl(image.src),local=(()=>{try{const url=new URL(src,location.href);return url.hostname==='localhost'||url.hostname==='127.0.0.1'||url.protocol==='blob:'||url.protocol==='data:';}catch{return true;}})();
- return <article className="article-image-item"><div className="article-image-thumb">{src?<img key={retry} src={src} alt={image.alt||'正文图片'} onLoad={()=>setStatus('loaded')} onError={()=>setStatus('failed')}/>:<Image size={23}/>}</div><div className="article-image-info"><strong>{image.alt||'未命名图片'}</strong><span className={'article-image-state '+(!src||status==='failed'?'is-failed':'')}>{!src?'地址不可用':status==='loaded'?'加载正常':status==='failed'?'加载失败':'正在检测…'}</span><p title={image.src}>{image.src.length>160?image.src.slice(0,160)+'…':image.src}</p>{local&&<small>本机或内嵌地址，跨平台使用前请上传到公网服务器。</small>}<div className="article-image-actions"><button disabled={busy} onClick={onEdit}><Link size={13}/>更换链接</button><button disabled={busy} onClick={onUpload}><Upload size={13}/>上传原图替换</button><button disabled={busy} onClick={()=>{setStatus('loading');setRetry(x=>x+1);}} aria-label="重新检测图片"><RefreshCw size={13}/></button></div></div></article>;
+ return <article className="article-image-item"><div className="article-image-thumb">{src?<img key={retry} src={src} alt={image.alt||'正文图片'} onLoad={()=>setStatus('loaded')} onError={()=>setStatus('failed')}/>:<Image size={23}/>}</div><div className="article-image-info"><strong>{image.alt||'未命名图片'}</strong><span className={'article-image-state '+(!src||status==='failed'?'is-failed':'')}>{!src?'地址不可用':status==='loaded'?'加载正常':status==='failed'?'加载失败':'正在检测…'}</span><p title={image.src}>{image.src.length>160?image.src.slice(0,160)+'…':image.src}</p>{local&&<small>本机或内嵌地址，跨平台使用前请上传到公网服务器。</small>}<div className="article-image-actions"><button disabled={busy} onClick={onEdit}><Link size={13}/>更换链接</button><button disabled={busy||!accountsEnabled} onClick={onUpload}><Upload size={13}/>{accountsEnabled?'上传原图替换':'上传原图 · 后续开放'}</button><button disabled={busy} onClick={()=>{setStatus('loading');setRetry(x=>x+1);}} aria-label="重新检测图片"><RefreshCw size={13}/></button></div></div></article>;
 }
 export function ArticleImages({markdown,owner,onReplace}:{markdown:string;owner:string;onReplace:(expected:string,next:string)=>void}){
  const [open,setOpen]=useState(false),[selection,setSelection]=useState<{image:ArticleImage;source:string}|null>(null),[url,setUrl]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[uploadedUrl,setUploadedUrl]=useState(''),[busy,setBusy]=useState(false);
@@ -30,7 +31,7 @@ export function ArticleImages({markdown,owner,onReplace}:{markdown:string;owner:
   <button className="article-images-trigger" onClick={()=>{setOpen(true);setError('');setNotice('');}}><Image size={15}/>文章图片</button>
   {open&&<Modal title="文章图片" onClose={()=>{if(!busy){setOpen(false);setSelection(null);}}}><div className="article-images-panel">
    <p className="article-images-intro">共 {images.length} 处 Markdown 图片。失效链接需要原图或新的可访问地址，上传替换会保留原图文件，不进行压缩。</p>
-   {!getAuthToken()&&<p className="article-images-tip">更换链接可直接使用；上传原图到服务器需要先登录。</p>}
+   {!getAuthToken()&&<p className="article-images-tip">{accountsEnabled?'更换链接可直接使用；上传原图到服务器需要先登录。':'更换链接可直接使用；服务器图片上传后续开放。'}</p>}
    {busy&&<p className="article-images-tip" role="status">正在上传原图，请勿关闭页面…</p>}
    {error&&<p className="article-images-error" role="alert">{error}</p>}{notice&&<p className="article-images-notice" role="status">{notice}</p>}
    {uploadedUrl&&<label className="article-image-recovery">已上传图片地址，可复制后更换链接<input aria-label="已上传图片地址" readOnly value={uploadedUrl} onFocus={e=>e.currentTarget.select()}/></label>}

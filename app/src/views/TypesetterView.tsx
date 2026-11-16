@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import { getAITypesetMarkdown } from '../ai/formatter';
+import {ApiConnectionTest} from '../components/ui/ApiConnectionTest';
 import { WorkbenchShell } from '../components/workbench/WorkbenchShell';
 import { ArticleControls } from '../features/articles/ArticleControls';
 import { ArticleImages } from '../features/images/ArticleImages';
@@ -41,7 +42,7 @@ import { buildWechatCopyRoot, copyWechatArticle } from '../core/wechatExport';
 import { CheatsheetModal } from '../components/ui/CheatsheetModal';
 import { DevIdentitySwitcher } from '../components/ui/DevIdentitySwitcher';
 import { api as discoveryApi } from '../features/discovery/api';
-import {phaseTwoEnabled} from '../services/releaseScope';
+import {accountsEnabled,phaseTwoEnabled} from '../services/releaseScope';
 import { FeishuSidebar } from '../components/ui/FeishuSidebar';
 import { HeaderMenu } from '../components/ui/HeaderMenu';
 import { InputPromptModal } from '../components/ui/InputPromptModal';
@@ -1208,7 +1209,7 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
                   )}
                 </>
               ) : isRealAuth ? (
-                <option value="login">登录后使用云端预设</option>
+                <option value="login">{accountsEnabled?'登录后使用云端预设':'云端预设 · 后续开放'}</option>
               ) : (
                 <option value="mock-disabled">OSS 调试模式不启用云端预设</option>
               )}
@@ -1304,7 +1305,7 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
       <main className="wb-editor-grid">
         <section className="wb-editor-pane">
           <div className="wb-pane-heading">
-            <span>Markdown 输入<small className="wb-draft-owner">{draftOwner==='guest'?'访客草稿 · 本浏览器':'当前账号草稿 · 本浏览器'}</small></span>
+            <span>Markdown 输入<small className="wb-draft-owner">{!accountsEnabled?'本机草稿 · 本浏览器':draftOwner==='guest'?'访客草稿 · 本浏览器':'当前账号草稿 · 本浏览器'}</small></span>
             <div className="wb-import-actions">
               <input
                 ref={fileInputRef}
@@ -1322,11 +1323,11 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
                 本地
               </button>
               <button
-                onClick={() => setShowFeishuSidebar(true)}
+                onClick={() => accountsEnabled ? setShowFeishuSidebar(true) : pushToast('info','飞书导入后续开放','当前可使用本地文件导入。')}
                 className="flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700"
               >
                 <Cloud className="mr-1 h-3.5 w-3.5" />
-                飞书
+                {accountsEnabled?'飞书':'飞书 · 后续开放'}
               </button>
               <button
                 onClick={() => setShowCheatsheet(true)}
@@ -1609,6 +1610,7 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
+                <ApiConnectionTest apiKey={apiKey} baseUrl={apiBaseUrl} model={apiModel}/>
               </div>
             )}
 
@@ -1638,7 +1640,7 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
                 </div>
 
                 {uploadMode === 'r2' && import.meta.env.VITE_API_SAME_ORIGIN === 'true' && (
-                  <p className="text-sm text-gray-500">图片保存到当前服务器，登录后即可上传。</p>
+                  <p className="text-sm text-gray-500">{accountsEnabled?'图片保存到当前服务器，登录后即可上传。':'服务器图片上传后续开放，当前可使用其他图床或图片链接。'}</p>
                 )}
                 {uploadMode === 'r2' && import.meta.env.VITE_API_SAME_ORIGIN !== 'true' && (
                   <>

@@ -16,7 +16,11 @@ try{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const base=`http://127.0.0.1:${server.address().port}`;
  app=await createApplication({dataDir:dir,staticDir:join(root,'app/dist'),publicUrl:base,config:{NODE_ENV:'production',ENABLE_PHASE2:'1'}});
- const auth=await(await fetch(base+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'scope-admin@example.test',password:'Scope-test123'})})).json();
+ const seed=await createApplication({dataDir:dir,staticDir:dir,publicUrl:base});
+ const seedServer=createServer(seed.handle);await new Promise(resolve=>seedServer.listen(0,'127.0.0.1',resolve));
+ const seedBase=`http://127.0.0.1:${seedServer.address().port}`;
+ const auth=await(await fetch(seedBase+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'scope-admin@example.test',password:'Scope-test123'})})).json();
+ seedServer.closeAllConnections();await new Promise(resolve=>seedServer.close(resolve));await seed.close();
  await app.db.prepare("UPDATE users SET role='admin' WHERE id=?").bind(auth.user.id).run();auth.user.role='admin';
  browser=await puppeteer.launch({executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
  for(const role of ['guest','admin']){
@@ -24,7 +28,7 @@ try{
   try{
    const page=await context.newPage();page.setDefaultTimeout(12000);await page.setViewport({width:1440,height:1000});
    page.on('pageerror',error=>errors.push(error.message));
-   page.on('request',request=>{if(/^\/api\/(articles|discovery|topics)(\/|$)/.test(new URL(request.url()).pathname))phaseTwoRequests.push(request.url());});
+   page.on('request',request=>{if(/^\/api\/(articles|discovery|topics|auth|user|admin|feishu)(\/|$)/.test(new URL(request.url()).pathname))phaseTwoRequests.push(request.url());});
    await page.goto(base,{waitUntil:'networkidle0'});
    if(role==='admin'){await page.evaluate(auth=>{localStorage.setItem('auth_token',auth.token);localStorage.setItem('auth_user',JSON.stringify(auth.user));localStorage.setItem('dev_identity_role','admin');},auth);await page.reload({waitUntil:'networkidle0'});}
    const check=async()=>{
@@ -33,9 +37,10 @@ try{
     assert.equal(await page.$('.rf-overview,.rf-articles,.articles-content,.article-save-trigger'),null);
    };
    await check();await page.screenshot({path:join(out,role+'-desktop.png')});
-   for(const path of ['/articles','/discovery','/topics','/topics/old-topic']){
-    await page.goto(base+path,{waitUntil:'networkidle0'});await page.waitForSelector('.wb-planned-status');assert.equal(new URL(page.url()).pathname,path);await check();
+   for(const path of ['/articles','/discovery','/topics','/topics/old-topic','/login','/register','/account']){
+    await page.goto(base+path,{waitUntil:'networkidle0'});await page.waitForSelector('.wb-planned-status');assert.equal(new URL(page.url()).pathname,path);await check();assert.equal(await page.$('input[type=password]'),null);
     assert.match(await page.$eval('.wb-planned',element=>element.textContent),/后续实现/);
+    if(path==='/login')await page.screenshot({path:join(out,role+'-login-planned.png')});
     if(path==='/articles')await page.screenshot({path:join(out,role+'-articles-planned.png')});
    }
    await page.goto(base+(role==='admin'?'/account':'/login'),{waitUntil:'networkidle0'});

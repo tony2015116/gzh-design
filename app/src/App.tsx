@@ -7,7 +7,7 @@ import AccountView from './views/AccountView';
 import PlannedFeatureView from './views/PlannedFeatureView';
 import FeishuCallbackView from './views/FeishuCallbackView';
 import VideoCompareView from './views/VideoCompareView';
-import {phaseTwoEnabled} from './services/releaseScope';
+import {accountsEnabled,phaseTwoEnabled} from './services/releaseScope';
 import {useDraftOwner} from './services/useDraftOwner';
 
 const ResearchView = phaseTwoEnabled ? lazy(() => import('./features/discovery/ResearchView')) : null;
@@ -29,11 +29,12 @@ export default function App() {
           <Route path="/topics" element={<PlannedFeatureView feature="topics" />} />
           <Route path="/topics/:id" element={<PlannedFeatureView feature="topics" />} />
         </>}
-        <Route path="/login" element={<LoginView />} />
-        <Route path="/account" element={<AccountView key={owner}/>} />
+        <Route path="/login" element={accountsEnabled ? <LoginView /> : <PlannedFeatureView feature="account" />} />
+        <Route path="/register" element={accountsEnabled ? <Navigate to="/login" replace /> : <PlannedFeatureView feature="account" />} />
+        <Route path="/account" element={accountsEnabled ? <AccountView key={owner}/> : <PlannedFeatureView feature="account" />} />
         <Route path="/articles" element={ArticlesView ? <Suspense fallback={null}><ArticlesView key={owner}/></Suspense> : <PlannedFeatureView feature="articles" />} />
         <Route path="/admin" element={<AdminView />} />
-        <Route path="/feishu/callback" element={<FeishuCallbackView />} />
+        <Route path="/feishu/callback" element={accountsEnabled ? <FeishuCallbackView /> : <PlannedFeatureView feature="account" />} />
         <Route path="/video-compare" element={<VideoCompareView />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

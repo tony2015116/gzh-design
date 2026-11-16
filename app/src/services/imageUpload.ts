@@ -1,4 +1,5 @@
 import {isLocalOssDevelopment} from './localDevelopment';
+import {accountsEnabled} from './releaseScope';
 
 /**
  * Image Upload Service
@@ -170,6 +171,7 @@ export async function uploadImageToR2(blob: Blob, config: R2Config): Promise<str
 
   const headers: Record<string, string> = {};
   const sameOrigin = new URL(config.workerUrl, location.href).origin === location.origin;
+  if (sameOrigin && !accountsEnabled) throw new Error('服务器图片上传后续开放，请使用图片链接或其他图床');
   const authToken = sameOrigin && (import.meta.env.VITE_API_SAME_ORIGIN === 'true' || isLocalOssDevelopment()) ? localStorage.getItem('auth_token') : null;
   if (authToken) {
     headers['Authorization'] = `Bearer ${authToken}`;

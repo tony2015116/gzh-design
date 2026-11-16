@@ -45,6 +45,11 @@ export async function createApplication({ dataDir, staticDir, publicUrl, config 
       const url = new URL(req.url, origin);
       // Ignore client supplied Host / forwarded headers when generating public URLs.
       if (url.origin !== origin) return res.writeHead(400).end();
+      // Public phase one is guest-only, including requests carrying older sessions.
+      const accountPath = /^\/api\/(?:auth|user|admin|feishu)(?:\/|$)/.test(url.pathname) || url.pathname === '/upload';
+      if (config.NODE_ENV === 'production' && accountPath) {
+        return res.writeHead(403, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end(JSON.stringify({ error: '账号及关联云端功能暂未开放，请使用本地排版与个人 API' }));
+      }
       const phaseTwoPath = /^\/api\/(?:articles|discovery|topics)(?:\/|$)/.test(url.pathname);
       if (phaseTwoPath && !phaseTwoEnabled) {
         return res.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end(JSON.stringify({ error: '接口不存在' }));

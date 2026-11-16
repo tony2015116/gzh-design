@@ -6,6 +6,7 @@
 import { loadR2Config } from './imageUpload';
 import { isLocalOssDevelopment } from './localDevelopment';
 import {notifyDraftOwnerChanged} from './draftScope.ts';
+import {accountsEnabled} from './releaseScope';
 
 export interface User {
   id: string;
@@ -86,6 +87,7 @@ export async function changePassword(oldPassword: string, newPassword: string): 
 
 /** Get currently logged in user */
 export function getCurrentUser(): User | null {
+  if (!accountsEnabled) return null;
   const raw = localStorage.getItem(USER_KEY);
   if (!raw) return null;
   try {
@@ -97,12 +99,12 @@ export function getCurrentUser(): User | null {
 
 /** Check if user is logged in (has a token) */
 export function isLoggedIn(): boolean {
-  return !!localStorage.getItem(TOKEN_KEY);
+  return accountsEnabled && !!localStorage.getItem(TOKEN_KEY);
 }
 
 /** Get the raw auth token for authenticated worker requests */
 export function getAuthToken(): string {
-  return localStorage.getItem(TOKEN_KEY) || '';
+  return accountsEnabled ? localStorage.getItem(TOKEN_KEY) || '' : '';
 }
 
 /** Register a new user */

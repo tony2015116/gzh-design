@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { HeaderMenu } from '../ui/HeaderMenu';
 import {AccountEntry} from './AccountEntry';
 import './workbench.css';
-import {phaseTwoEnabled} from '../../services/releaseScope';
+import {accountsEnabled,phaseTwoEnabled} from '../../services/releaseScope';
 
 interface WorkbenchShellProps {
   children: ReactNode;
@@ -29,7 +29,7 @@ export function WorkbenchShell({ children, toolbar, actions, userName, realAuth,
 
   const navigate = useNavigate();
   const title = section === 'articles' ? '我的文章' : section === 'account' ? '用户中心' : section === 'discovery' ? '爆文发现' : section === 'topics' ? '我的选题' : '文章排版';
-  const planned = !phaseTwoEnabled && ['articles','discovery','topics'].includes(section);
+  const planned = (!accountsEnabled && section==='account') || (!phaseTwoEnabled && ['articles','discovery','topics'].includes(section));
   const heading = planned ? '更多创作能力，后续实现。' : section === 'articles' ? '写过的每一篇，都有自己的位置。' : section === 'account' ? '你的账号，你的创作空间。' : section === 'discovery' ? '好选题，先从值得读的文章开始。' : section === 'topics' ? '留住灵感，写出自己的角度。' : '把内容写好，把样子交给这里。';
   const subtitle = planned ? '当前先专注文章排版，更多功能正在准备中。' : section === 'articles' ? '保存正文，随时接着写。' : section === 'account' ? '查看个人信息，管理账号与登录安全。' : section === 'discovery' ? '从文章库里寻找灵感，留下你的下一篇。' : section === 'topics' ? '参考有出处，观点有自己的来由。' : '专注写作，实时预览，复制到公众号。';
   const guard = (event: { preventDefault: () => void }) => { if (onLeave && !onLeave()) event.preventDefault(); };
@@ -112,8 +112,8 @@ export function WorkbenchShell({ children, toolbar, actions, userName, realAuth,
           { key: 'articles', label: phaseTwoEnabled?'我的文章':'我的文章 · 后续实现', icon: <FolderOpen size={15} className="mr-2" />, onSelect: () => go('/articles') },
           { key: 'discovery', label: phaseTwoEnabled?'爆文发现':'爆文发现 · 后续实现', icon: <Radar size={15} className="mr-2" />, onSelect: () => go('/discovery') },
           { key: 'topics', label: phaseTwoEnabled?'我的选题':'我的选题 · 后续实现', icon: <Bookmark size={15} className="mr-2" />, onSelect: () => go('/topics') },
-          ...(userName && !debugIdentity ? [{ key: 'account', label: '用户中心', icon: <PenTool size={15} className="mr-2" />, onSelect: () => go('/account') }, { key: 'logout', label: '退出登录', icon: <LogOut size={15} className="mr-2" />, onSelect: onLogout }] : []),
-        ]} /></div>{realAuth && (!userName || debugIdentity) && <button className="wb-login" onClick={onLogin}>登录 / 注册</button>}{userName && !debugIdentity ? <Link className="wb-top-role" to="/account" onClick={guard} aria-label="用户中心">{userName}</Link> : <span className="wb-top-role">{userName || (realAuth ? '访客' : '本地模式')}</span>}</div></header>
+          ...(accountsEnabled && userName && !debugIdentity ? [{ key: 'account', label: '用户中心', icon: <PenTool size={15} className="mr-2" />, onSelect: () => go('/account') }, { key: 'logout', label: '退出登录', icon: <LogOut size={15} className="mr-2" />, onSelect: onLogout }] : []),
+        ]} /></div>{realAuth && (!userName || debugIdentity) && <button className="wb-login" onClick={onLogin}>{accountsEnabled?'登录 / 注册':'登录 / 注册 · 后续开放'}</button>}{accountsEnabled && userName && !debugIdentity ? <Link className="wb-top-role" to="/account" onClick={guard} aria-label="用户中心">{userName}</Link> : <span className="wb-top-role">{userName || (realAuth ? '访客' : '本地模式')}</span>}</div></header>
         <div className="wb-workspace">
           <div className="wb-heading"><div><p className="wb-eyebrow">WRITE WITH CLARITY</p><h1>{heading}</h1><p className="wb-subtitle">{subtitle}</p></div><div className="wb-heading-right">{section === 'typesetter' && <span className={`wb-draft-state ${draftState === 'error' ? 'is-error' : ''}`} role="status">{draftState === 'saved' ? <Check size={12} /> : <span className="wb-status-dot"></span>}{draftLabel}</span>}<div className="wb-actions">{actions}{focusMode && <button className="wb-focus-settings" onClick={onSettings} aria-label="工作台设置" title="工作台设置"><Settings size={15} /></button>}{section === 'typesetter' && <button className="wb-focus-toggle" onClick={() => void (focusMode ? leaveFocus() : enterFocus())} disabled={focusBusy} aria-label={focusMode ? '退出专注全屏' : '进入专注全屏'} aria-pressed={focusMode} title={focusMode ? '退出专注全屏（Esc）' : '收起外围界面，进入专注全屏'}>{focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}<span>{focusMode ? '退出全屏' : '专注全屏'}</span>{focusMode && <kbd>Esc</kbd>}</button>}</div></div></div>
           {toolbar && <div className="wb-toolbar" aria-label={section === 'typesetter' ? '文章外观设置' : '筛选与查询'}>{toolbar}</div>}
