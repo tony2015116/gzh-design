@@ -106,9 +106,9 @@ export default function AdminView() {
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
               <Shield className="h-6 w-6 text-emerald-600" />
-              控制台
+              本地开发控制台
             </h1>
-            <p className="mt-1 text-sm text-slate-500">统一维护本地配置、当前环境状态和线上后端自检结果。</p>
+            <p className="mt-1 text-sm text-slate-500">维护当前浏览器的配置与开发诊断信息，保存操作不会修改服务器配置。</p>
           </div>
         </div>
 
@@ -116,7 +116,7 @@ export default function AdminView() {
           <div className="overflow-hidden rounded-[28px] border border-white/60 bg-white/85 shadow-[0_28px_80px_rgba(15,23,42,0.08)] backdrop-blur-xl">
             <div className="border-b border-slate-100 px-6 py-6">
               <h2 className="text-lg font-semibold text-slate-900">大模型配置</h2>
-              <p className="mt-1 text-sm text-slate-500">{isOnlineMode ? '模型由服务器管理员统一配置，个人无需填写 API Key。' : '兼容 OpenAI 格式接口，使用你自己的模型配置。'}</p>
+              <p className="mt-1 text-sm text-slate-500">个人 API 请在工作台设置中填写和测试，配置仅保存在当前浏览器。会员服务端 API 后续开放。</p>
             </div>
 
             <div className="space-y-6 px-6 py-6">
@@ -176,7 +176,7 @@ export default function AdminView() {
                 </div>
 
                 {uploadMode === 'r2' && import.meta.env.VITE_API_SAME_ORIGIN === 'true' && (
-                  <p className="mt-4 text-sm text-slate-500">图片保存到当前服务器，登录后即可上传。</p>
+                  <p className="mt-4 text-sm text-slate-500">本地开发可登录测试服务器上传；生产环境的账号和服务器上传暂未开放。</p>
                 )}
                 {uploadMode === 'r2' && import.meta.env.VITE_API_SAME_ORIGIN !== 'true' && (
                   <div className="mt-4 space-y-4 rounded-[20px] border border-sky-100 bg-sky-50/70 p-4">
@@ -235,7 +235,7 @@ export default function AdminView() {
                   className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/15 transition-all hover:bg-slate-800 active:scale-[0.98]"
                 >
                   <Save className="h-4 w-4" />
-                  保存全局配置
+                  保存本机设置
                 </button>
               </div>
             </div>

@@ -14,6 +14,7 @@ test('phase-two frontend flag is forced off in production output',async()=>{
   const module={exports:{}};new Function('module','exports',result.outputFiles[0].text)(module,module.exports);
   assert.equal(module.exports.phaseTwoEnabled,expected);
   assert.equal(module.exports.accountsEnabled,dev);
+  assert.equal(module.exports.diagnosticsEnabled,dev);
  }
 });
 

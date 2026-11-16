@@ -32,11 +32,19 @@ try{
    await page.goto(base,{waitUntil:'networkidle0'});
    if(role==='admin'){await page.evaluate(auth=>{localStorage.setItem('auth_token',auth.token);localStorage.setItem('auth_user',JSON.stringify(auth.user));localStorage.setItem('dev_identity_role','admin');},auth);await page.reload({waitUntil:'networkidle0'});}
    const check=async()=>{
+    assert.equal(await page.$eval('body',element=>element.textContent.includes('配置与诊断')),false);
     for(const path of ['/articles','/discovery','/topics'])assert.ok(await page.$(`a[href="${path}"]`));
     assert.equal(await page.$$eval('.wb-sidebar .wb-tag',tags=>tags.filter(tag=>tag.textContent==='后续实现').length),3);
     assert.equal(await page.$('.rf-overview,.rf-articles,.articles-content,.article-save-trigger'),null);
    };
    await check();await page.screenshot({path:join(out,role+'-desktop.png')});
+   await page.goto(base+'/admin',{waitUntil:'networkidle0'});
+   await page.waitForSelector('textarea[aria-label="Markdown 正文"]');
+   assert.equal(new URL(page.url()).pathname,'/');
+   assert.equal(await page.$eval('body',element=>element.textContent.includes('本地环境诊断')),false);
+   await page.evaluate(()=>[...document.querySelectorAll('button')].find(button=>button.textContent.trim()==='工作台设置')?.click());
+   await page.waitForSelector('#personal-ai-key');
+   await page.click('button[aria-label="关闭工作台设置"]');
    for(const path of ['/articles','/discovery','/topics','/topics/old-topic','/login','/register','/account']){
     await page.goto(base+path,{waitUntil:'networkidle0'});await page.waitForSelector('.wb-planned-status');assert.equal(new URL(page.url()).pathname,path);await check();assert.equal(await page.$('input[type=password]'),null);
     assert.match(await page.$eval('.wb-planned',element=>element.textContent),/后续实现/);

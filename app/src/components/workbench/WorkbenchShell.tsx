@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { HeaderMenu } from '../ui/HeaderMenu';
 import {AccountEntry} from './AccountEntry';
 import './workbench.css';
-import {accountsEnabled,phaseTwoEnabled} from '../../services/releaseScope';
+import {accountsEnabled,diagnosticsEnabled,phaseTwoEnabled} from '../../services/releaseScope';
 
 interface WorkbenchShellProps {
   children: ReactNode;
@@ -100,14 +100,14 @@ export function WorkbenchShell({ children, toolbar, actions, userName, realAuth,
         <div className="wb-sidebar-bottom">
           <div className="wb-phase"><small>你的创作工作台</small><strong>{phaseTwoEnabled ? '灵感与文章，在一起。' : '专注写作，轻松排版。'}</strong><p>{phaseTwoEnabled ? <>发现值得研究的内容，<br />留下自己的观点与素材。</> : <>写好正文，调整样式，<br />复制到公众号。</>}</p><span className="wb-phase-line"></span><footer><span>{phaseTwoEnabled ? '发现 · 选题 · 排版' : '写作 · 排版 · 导出'}</span></footer></div>
           <button className="wb-nav-item" onClick={onSettings} aria-label="工作台设置"><Settings size={18} /><span>工作台设置</span></button>
-          <button className="wb-nav-item" onClick={onConsole}><CircleHelp size={18} /><span>配置与诊断</span></button>
+          {diagnosticsEnabled && <button className="wb-nav-item" onClick={onConsole}><CircleHelp size={18} /><span>配置与诊断</span></button>}
           <AccountEntry userName={userName} realAuth={realAuth} debugIdentity={debugIdentity} active={section === "account"} onLogin={onLogin} onLogout={onLogout} onNavigate={guard} />
         </div>
       </aside>
       <div className="wb-content">
         <header className="wb-topbar"><div className="wb-breadcrumb"><span className="wb-mobile-brand"><PenTool size={18} />公众号工作台</span><span className="wb-desktop-crumb">创作空间</span><span className="wb-divider">/</span><strong>{title}</strong></div><div className="wb-top-tools"><button onClick={onHelp}><BookOpen size={15} /><span>使用指南</span></button><button className="wb-mobile-settings" onClick={onSettings} aria-label="工作台设置"><Settings size={18} /></button><div className="wb-mobile-navigation"><HeaderMenu label="导航" icon={<Menu size={16} />} buttonClassName="wb-mobile-menu-button" items={[
           { key: 'video', label: '视频对比', icon: <MonitorPlay size={15} className="mr-2" />, onSelect: onVideo },
-          { key: 'console', label: '配置与诊断', icon: <Settings size={15} className="mr-2" />, onSelect: onConsole },
+          ...(diagnosticsEnabled ? [{ key: 'console', label: '配置与诊断', icon: <Settings size={15} className="mr-2" />, onSelect: onConsole }] : []),
           { key: 'typesetter', label: '文章排版', icon: <FileText size={15} className="mr-2" />, onSelect: () => go('/') },
           { key: 'articles', label: phaseTwoEnabled?'我的文章':'我的文章 · 后续实现', icon: <FolderOpen size={15} className="mr-2" />, onSelect: () => go('/articles') },
           { key: 'discovery', label: phaseTwoEnabled?'爆文发现':'爆文发现 · 后续实现', icon: <Radar size={15} className="mr-2" />, onSelect: () => go('/discovery') },
