@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react';
-import { loadUploadMode, loadR2Config, loadCdnConfig, compressImageToBlob, uploadImageToR2, uploadImageToCdn } from '../../services/imageUpload';
+import { loadUploadMode, loadCdnConfig, compressImageToBlob, uploadImageToCdn } from '../../services/imageUpload';
 
 interface EditorProps {
   value: string;
@@ -88,7 +88,7 @@ export const Editor: React.FC<EditorProps> = ({ value, onChange, editorRef, onSc
     reader.readAsDataURL(file);
   };
 
-  /** Upload via CDN (R2 or custom) with placeholder + fallback */
+  /** Upload via custom CDN with placeholder + fallback */
   const handleCdnUpload = (
     file: File,
     textarea: HTMLTextAreaElement,
@@ -135,14 +135,7 @@ export const Editor: React.FC<EditorProps> = ({ value, onChange, editorRef, onSc
 
     const mode = loadUploadMode();
 
-    if (mode === 'r2') {
-      const r2Config = loadR2Config();
-      if (r2Config) {
-        handleCdnUpload(file, textarea, start, end, (blob) => uploadImageToR2(blob, r2Config));
-      } else {
-        handleBase64Fallback(file, textarea, start, end);
-      }
-    } else if (mode === 'custom') {
+    if (mode === 'custom') {
       const cdnConfig = loadCdnConfig();
       if (cdnConfig) {
         handleCdnUpload(file, textarea, start, end, (blob) => uploadImageToCdn(blob, cdnConfig));

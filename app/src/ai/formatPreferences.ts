@@ -1,6 +1,4 @@
-// AI 一键排版的用户偏好。与 Worker 端 worker/src/lib/formatPreferences.ts 保持一致：
-// 本地模式在这里拼提示词，在线模式只把偏好枚举值传给 Worker，由 Worker 自己拼（不接受前端传入的提示词文本）。
-// worker/tests/format-prompt.test.ts 会校验两份的输出是否相同。
+// AI 一键排版的用户偏好。
 
 export type FormatPreferenceLevel = 'default' | 'more' | 'less';
 

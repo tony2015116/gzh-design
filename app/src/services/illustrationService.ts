@@ -1,5 +1,3 @@
-import { getAuthToken } from './authService';
-import { loadR2Config } from './imageUpload';
 import { resolveChatEndpoint } from '../ai/chatCompletion';
 import {
   createOssIllustrationTraceId,
@@ -117,10 +115,6 @@ interface IllustrationStructuredSpec {
   bridge: IllustrationBridgeSpec | null;
 }
 
-function getWorkerUrl(): string {
-  const r2Config = loadR2Config();
-  return (r2Config?.workerUrl || '').replace(/\/$/, '');
-}
 
 function getLocalAiConfig(): { apiKey: string; baseUrl: string; model: string } {
   return {
@@ -1678,39 +1672,4 @@ export async function getIllustrationPlan(request: IllustrationPlanRequest): Pro
 
 export async function createIllustrationJob(request: IllustrationJobRequest): Promise<IllustrationJob> {
   return await createLocalIllustrationJob(request);
-}
-
-export async function getIllustrationJob(jobId: string): Promise<IllustrationJob> {
-  const isOnlineMode = import.meta.env.VITE_APP_MODE === 'online';
-  if (!isOnlineMode) {
-    throw new Error('OSS 模式下没有远程配图任务查询。');
-  }
-
-  const workerUrl = getWorkerUrl();
-  if (!workerUrl) {
-    throw new Error('未配置 后端地址，无法查询在线配图任务。');
-  }
-
-  const token = getAuthToken();
-  const response = await fetch(`${workerUrl}/api/illustration/jobs/${encodeURIComponent(jobId)}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-
-  const text = await response.text();
-  let data: any = {};
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = {};
-  }
-
-  if (!response.ok) {
-    throw new Error(data.error || `智能配图任务查询失败 (${response.status})`);
-  }
-
-  return data.job as IllustrationJob;
 }

@@ -1,5 +1,4 @@
-// 与 Worker 端 worker/src/lib/formatPrompt.ts 保持逐字一致（本地模式走这里，在线模式走 Worker 那份）。
-// 修改任一侧时另一侧必须同步，worker/tests/format-prompt.test.ts 会校验两份是否相同。
+// AI 排版提示词。
 export const FORMAT_PROMPT = `
 你是一个专业的微信公众号排版助手。你的任务是给用户提供的 Markdown 文章加上排版结构，而不是改写文章。
 

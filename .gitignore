@@ -42,3 +42,6 @@ server/data-*/
 1.jpg
 tishici.txt
 排版.txt
+
+# Windows 安装包
+app/release/

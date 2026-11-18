@@ -91,8 +91,7 @@ const readCompletionContent = async (response: Response): Promise<string> => {
 
 /**
  * 使用个人API调用 OpenAI 兼容 chat/completions，返回 message content。
- * 开发环境走 vite dev server 的同源代理 /__ai-proxy（部分第三方中转没有
- * CORS 头，浏览器直连会被拦截）；生产构建只能直连，要求中转支持跨域。
+ * 模型服务需要允许应用发起跨域请求。
  */
 export const ossChatCompletion = async ({
   endpoint,
@@ -113,25 +112,6 @@ export const ossChatCompletion = async ({
     // 流式：避免长文生成时中转的 Cloudflare 边缘 100 秒无响应超时（524）
     stream: true,
   };
-
-  if (import.meta.env.DEV) {
-    const response = await fetch('/__ai-proxy', {
-      method: 'POST',
-      signal,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        endpoint,
-        headers: { Authorization: `Bearer ${apiKey}` },
-        payload,
-      }),
-    });
-
-    if (!response.ok) {
-      await parseErrorResponse(response, 'AI 请求失败（dev 代理）');
-    }
-
-    return readCompletionContent(response);
-  }
 
   const response = await fetch(endpoint, {
     method: 'POST',

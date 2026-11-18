@@ -1,27 +1,3 @@
-import {isLocalOssDevelopment} from './localDevelopment';
-import {accountsEnabled} from './releaseScope';
-
-/**
- * Image Upload Service
- *
- * Supports three upload modes:
- * - r2:     服务器图床 via Worker proxy (recommended)
- * - custom: User-configured generic HTTP endpoint
- * - base64: No upload, inline as data URI (default fallback)
- */
-
-/* ============================================================
- * Types
- * ============================================================ */
-
-export type UploadMode = 'r2' | 'custom' | 'base64';
-
-/** Server image upload configuration */
-export interface R2Config {
-  workerUrl: string;      // e.g. https://gzh-image-worker.yourname.workers.dev
-  uploadSecret: string;   // Bearer token for auth
-}
-
 /** Generic CDN endpoint config (legacy) */
 export interface CdnConfig {
   uploadUrl: string;
@@ -34,53 +10,17 @@ export interface CdnConfig {
  * Persistence helpers
  * ============================================================ */
 
+export type UploadMode = 'custom' | 'base64';
+
 const UPLOAD_MODE_KEY = 'upload_mode';
-const R2_CONFIG_KEY = 'r2_upload_config';
-const LEGACY_R2_CONFIG_KEY = 'r2_config';
 const CDN_CONFIG_KEY = 'cdn_upload_config';
 
-const ENV_DEFAULT_UPLOAD_MODE = import.meta.env.VITE_DEFAULT_UPLOAD_MODE;
-const ENV_R2_CONFIG: R2Config | null = import.meta.env.VITE_WORKER_URL?.trim()
-  ? {
-      workerUrl: import.meta.env.VITE_WORKER_URL.trim(),
-      uploadSecret: import.meta.env.VITE_WORKER_UPLOAD_SECRET?.trim() || '',
-    }
-  : null;
-
-// --- Upload Mode ---
 export function loadUploadMode(): UploadMode {
-  const raw = localStorage.getItem(UPLOAD_MODE_KEY);
-  if (raw === 'r2' || raw === 'custom' || raw === 'base64') return raw;
-  if (ENV_DEFAULT_UPLOAD_MODE === 'r2' || ENV_DEFAULT_UPLOAD_MODE === 'custom') return ENV_DEFAULT_UPLOAD_MODE;
-  return 'base64';
+  return localStorage.getItem(UPLOAD_MODE_KEY) === 'custom' ? 'custom' : 'base64';
 }
+
 export function saveUploadMode(mode: UploadMode): void {
   localStorage.setItem(UPLOAD_MODE_KEY, mode);
-}
-
-// --- R2 Config ---
-export function loadR2Config(): R2Config | null {
-  // Self-hosted builds always use this site's backend, including browsers with old CF settings.
-  if (import.meta.env.VITE_API_SAME_ORIGIN === 'true' || isLocalOssDevelopment()) {
-    return { workerUrl: window.location.origin, uploadSecret: '' };
-  }
-  const raw = localStorage.getItem(R2_CONFIG_KEY) ?? localStorage.getItem(LEGACY_R2_CONFIG_KEY);
-  if (!raw) return ENV_R2_CONFIG;
-  try {
-    const cfg = JSON.parse(raw) as R2Config;
-    if (!cfg.workerUrl?.trim()) return ENV_R2_CONFIG;
-    if (!localStorage.getItem(R2_CONFIG_KEY)) {
-      localStorage.setItem(R2_CONFIG_KEY, JSON.stringify(cfg));
-    }
-    return cfg;
-  } catch {
-    return ENV_R2_CONFIG;
-  }
-}
-export function saveR2Config(config: R2Config): void {
-  const raw = JSON.stringify(config);
-  localStorage.setItem(R2_CONFIG_KEY, raw);
-  localStorage.setItem(LEGACY_R2_CONFIG_KEY, raw);
 }
 
 // --- CDN Config (legacy) ---
@@ -161,42 +101,6 @@ export function compressImageToBlob(
 /* ============================================================
  * Upload functions
  * ============================================================ */
-
-/**
- * Upload a compressed Blob to 服务器图床 via Worker proxy.
- */
-export async function uploadImageToR2(blob: Blob, config: R2Config): Promise<string> {
-  const formData = new FormData();
-  formData.append('file', blob, `image-${Date.now()}.jpg`);
-
-  const headers: Record<string, string> = {};
-  const sameOrigin = new URL(config.workerUrl, location.href).origin === location.origin;
-  if (sameOrigin && !accountsEnabled) throw new Error('服务器图片上传后续开放，请使用图片链接或其他图床');
-  const authToken = sameOrigin && (import.meta.env.VITE_API_SAME_ORIGIN === 'true' || isLocalOssDevelopment()) ? localStorage.getItem('auth_token') : null;
-  if (authToken) {
-    headers['Authorization'] = `Bearer ${authToken}`;
-  } else if (config.uploadSecret?.trim()) {
-    headers['Authorization'] = `Bearer ${config.uploadSecret}`;
-  }
-
-  const response = await fetch(config.workerUrl.replace(/\/+$/, '') + '/upload', {
-    method: 'POST',
-    headers,
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`图片上传失败: HTTP ${response.status} ${text.substring(0, 200)}`);
-  }
-
-  const json = await response.json();
-  if (!json.success || !json.url) {
-    throw new Error(`图片上传失败: ${JSON.stringify(json).substring(0, 200)}`);
-  }
-
-  return json.url;
-}
 
 /**
  * Upload a Blob to a generic CDN endpoint.

@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   BookOpen,
-  Cloud,
   Copy,
   FileText,
   ImageDown,
@@ -17,11 +15,9 @@ import {
 import { getAITypesetMarkdown } from '../ai/formatter';
 import {ApiConnectionTest} from '../components/ui/ApiConnectionTest';
 import { WorkbenchShell } from '../components/workbench/WorkbenchShell';
-import { ArticleControls } from '../features/articles/ArticleControls';
 import { ArticleImages } from '../features/images/ArticleImages';
 import { ImportArticleModal, type PendingArticleImport } from '../components/ui/ImportArticleModal';
 import { atomicDraftWrite, draftKeys } from '../services/draftScope';
-import {articleIdentityJson,loadArticleIdentity,notifyArticleIdentity} from '../services/articleIdentity';
 import { UiSkinControl } from '../components/workbench/UiSkinControl';
 import { analyzeAiTypesetOutput } from '../ai/aiOutputCheck';
 import type { AiOutputAnalysis } from '../ai/aiOutputCheck';
@@ -34,18 +30,12 @@ import {
   loadUndoSnapshot,
   saveDraft,
   saveUndoSnapshot,
-  restoreGuestDraft,
   type UndoSnapshot,
 } from '../services/draftStorage';
 import { Preview } from '../components/preview/Preview';
 import { buildWechatCopyRoot, copyWechatArticle } from '../core/wechatExport';
 import { CheatsheetModal } from '../components/ui/CheatsheetModal';
-import { DevIdentitySwitcher } from '../components/ui/DevIdentitySwitcher';
-import { api as discoveryApi } from '../features/discovery/api';
-import {accountsEnabled,phaseTwoEnabled} from '../services/releaseScope';
-import { FeishuSidebar } from '../components/ui/FeishuSidebar';
 import { HeaderMenu } from '../components/ui/HeaderMenu';
-import { InputPromptModal } from '../components/ui/InputPromptModal';
 import { IllustrationJobPanel } from '../components/ui/IllustrationJobPanel';
 import { IllustrationPlanModal } from '../components/ui/IllustrationPlanModal';
 import { PlatformExportPanel } from '../components/ui/PlatformExportPanel';
@@ -57,17 +47,15 @@ import { StyleSchemeControl } from '../components/ui/StyleSchemeControl';
 import { Editor } from '../components/editor/Editor';
 import { DEFAULT_IMAGE_STYLE, DEFAULT_LAYOUT_STYLE, IMAGE_STYLES, LAYOUT_STYLES } from '../core/style';
 import type { ImageStyle, LayoutStyle } from '../core/style';
-import { DEFAULT_EMPHASIS_CONFIG, normalizeEmphasisConfig } from '../core/emphasis';
+import { DEFAULT_EMPHASIS_CONFIG } from '../core/emphasis';
 import type { EmphasisConfig } from '../core/emphasis';
 import {
   DEFAULT_TYPOGRAPHY_CONFIG,
   createTypographyConfigForLayout,
-  normalizeTypographyConfig,
 } from '../core/typography';
 import type { TypographyConfig } from '../core/typography';
 import {
   DEFAULT_COMPONENT_STYLE_CONFIG,
-  normalizeComponentStyleConfig,
 } from '../core/componentStyle';
 import type { ComponentStyleConfig } from '../core/componentStyle';
 import {
@@ -86,36 +74,15 @@ import type { StyleScheme } from '../core/styleScheme';
 import { DEFAULT_THEME, THEMES } from '../core/theme';
 import type { Theme } from '../core/theme';
 import {
-  getAiTypesetAccess,
-  getIllustrationAccess,
-  loadDevIdentityRole,
-  saveDevIdentityRole,
-  shouldShowDevIdentitySwitcher,
-  usesRealAuth,
-  type DevIdentityRole,
-} from '../services/accessControl';
-import {
-  changePassword,
-  fetchPresets,
-  getCurrentUser,
-  logout,
-  refreshUser,
-  savePreset,
-} from '../services/authService';
-import type { Preset, User } from '../services/authService';
-import {
   createIllustrationJob,
-  getIllustrationJob,
   type IllustrationJob,
   getIllustrationPlan,
   type IllustrationPlan,
 } from '../services/illustrationService';
 import {
   loadCdnConfig,
-  loadR2Config,
   loadUploadMode,
   saveCdnConfig,
-  saveR2Config,
   saveUploadMode,
 } from '../services/imageUpload';
 import type { UploadMode } from '../services/imageUpload';
@@ -212,28 +179,13 @@ function createArticle(title, theme = 'jade') {
 const FORMAT_PREFERENCES_STORAGE_KEY = 'ai_format_preferences';
 const FORMAT_CUSTOM_NOTE_STORAGE_KEY = 'ai_format_custom_note';
 
-function TypesetterView({draftOwner}:{draftOwner:string}) {
-  const isOnlineMode = import.meta.env.VITE_APP_MODE === 'online';
-  const isRealAuth = usesRealAuth();
-  const [localDiscoveryDebug, setLocalDiscoveryDebug] = useState(false);
-  const showDevIdentity = shouldShowDevIdentitySwitcher() || localDiscoveryDebug;
-  useEffect(() => {
-    if (!phaseTwoEnabled || !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) return;
-    let alive = true;
-    void discoveryApi<{ localDebug: boolean }>('/api/discovery/local-session').then(data => { if (alive) setLocalDiscoveryDebug(data.localDebug); }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
-  const navigate = useNavigate();
-
-  const [markdown, setMarkdownState] = useState(() => loadDraft(draftOwner) ?? defaultMarkdown);
+function TypesetterView() {
+  const [markdown, setMarkdownState] = useState(() => loadDraft() ?? defaultMarkdown);
   const latestMarkdown=useRef(markdown);
   const setMarkdown=useCallback((value:string)=>{latestMarkdown.current=value;setMarkdownState(value);},[]);
-  const [guestDraft]=useState(()=>loadDraft('guest'));
-  const guestRecoveryAvailable=draftOwner!=='guest'&&Boolean(guestDraft&&guestDraft!==defaultMarkdown);
-  const [showGuestRecovery,setShowGuestRecovery]=useState(()=>{try{return !localStorage.getItem('gzh_guest_draft_dismissed:'+draftOwner);}catch{return true;}});
   const [draftSaveState, setDraftSaveState] = useState<'saving' | 'saved' | 'error'>('saving');
   const [previewWidth, setPreviewWidth] = useState<375 | 677>(375);
-  const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(()=>loadUndoSnapshot(draftOwner));
+  const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(()=>loadUndoSnapshot());
   const [pendingImport, setPendingImport] = useState<PendingArticleImport | null>(null);
   const [importError, setImportError] = useState('');
   const [pendingAiResult, setPendingAiResult] = useState<{
@@ -275,37 +227,20 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
   const [settingsTab, setSettingsTab] = useState<'ai' | 'cdn'>('ai');
 
   const [uploadMode, setUploadMode] = useState<UploadMode>(loadUploadMode());
-  const savedR2 = loadR2Config();
-  const [r2WorkerUrl, setR2WorkerUrl] = useState(savedR2?.workerUrl || '');
-  const [r2UploadSecret, setR2UploadSecret] = useState(savedR2?.uploadSecret || '');
   const savedCdn = loadCdnConfig();
   const [cdnUploadUrl, setCdnUploadUrl] = useState(savedCdn?.uploadUrl || '');
   const [cdnFieldName, setCdnFieldName] = useState(savedCdn?.fieldName || 'file');
   const [cdnHeaders, setCdnHeaders] = useState(savedCdn?.headers || '');
   const [cdnResponsePath, setCdnResponsePath] = useState(savedCdn?.responsePath || 'data.url');
 
-  const [authUser, setAuthUser] = useState<User | null>(getCurrentUser());
-  const [devIdentityRole, setDevIdentityRole] = useState<DevIdentityRole>(loadDevIdentityRole());
-  const [presets, setPresets] = useState<Preset[]>([]);
   const [illustrationPlan, setIllustrationPlan] = useState<IllustrationPlan | null>(null);
   const [lastIllustrationJob, setLastIllustrationJob] = useState<IllustrationJob | null>(null);
   const [selectedIllustrationIds, setSelectedIllustrationIds] = useState<string[]>([]);
   const [toastItems, setToastItems] = useState<ToastItem[]>([]);
-  const [showPresetNameModal, setShowPresetNameModal] = useState(false);
-  const [presetNameInput, setPresetNameInput] = useState('');
-  const [isSavingPreset, setIsSavingPreset] = useState(false);
   const [previewTab, setPreviewTab] = useState<'wechat' | 'xThread' | 'xArticle'>('wechat');
   const [xThreadExport, setXThreadExport] = useState<XThreadExport | null>(null);
   const [xArticleExport, setXArticleExport] = useState<XArticleExport | null>(null);
   const [showImageExportPanel, setShowImageExportPanel] = useState(false);
-  const [showFeishuSidebar, setShowFeishuSidebar] = useState(false);
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-
-  const canUseCloudPresets = isRealAuth && Boolean(authUser);
-  const canChangePassword = isRealAuth && Boolean(authUser);
   const currentStyleSelection = {
     themeId: activeTheme.id,
     layoutId: activeLayoutStyle.id,
@@ -336,73 +271,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
   const isSyncingLeft = useRef(false);
   const isSyncingRight = useRef(false);
   const scrollSyncRafRef = useRef<number | null>(null);
-  const notifiedIllustrationJobsRef = useRef<Record<string, IllustrationJob['status']>>({});
-
-  useEffect(() => {
-    if (!isRealAuth) return;
-
-    refreshUser().then(setAuthUser).catch(() => setAuthUser(getCurrentUser()));
-  }, [isRealAuth]);
-
-  useEffect(() => {
-    if (!canUseCloudPresets) {
-      setPresets([]);
-      return;
-    }
-
-    fetchPresets().then(setPresets).catch(console.error);
-  }, [canUseCloudPresets]);
-
-  useEffect(() => {
-    if (!isOnlineMode || !lastIllustrationJob || lastIllustrationJob.id.startsWith('oss-')) return;
-    if (!['queued', 'running', 'waiting'].includes(lastIllustrationJob.status)) return;
-
-    let cancelled = false;
-    const jobId = lastIllustrationJob.id;
-
-    const pollJob = async () => {
-      try {
-        const nextJob = await getIllustrationJob(jobId);
-        if (cancelled) return;
-
-        setLastIllustrationJob((current) => (
-          current?.id === jobId ? nextJob : current
-        ));
-
-        if (
-          (nextJob.status === 'completed' || nextJob.status === 'failed')
-          && notifiedIllustrationJobsRef.current[jobId] !== nextJob.status
-        ) {
-          notifiedIllustrationJobsRef.current[jobId] = nextJob.status;
-          if (nextJob.status === 'completed') {
-            pushToast('success', '配图任务已完成', '结果已经生成，可在右下角面板中决定是否应用到正文。');
-          } else {
-            pushToast('error', '配图任务失败', nextJob.error || '后台生成失败，请稍后重试。');
-          }
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('轮询配图任务失败:', error);
-        }
-      }
-    };
-
-    void pollJob();
-    const timer = window.setInterval(() => {
-      void pollJob();
-    }, 3000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [isOnlineMode, lastIllustrationJob?.id, lastIllustrationJob?.status]);
-
-  const handleDevIdentityChange = (role: DevIdentityRole) => {
-    saveDevIdentityRole(role);
-    setDevIdentityRole(role);
-  };
-
   const dismissToast = (id: string) => {
     setToastItems((current) => current.filter((item) => item.id !== id));
   };
@@ -417,16 +285,16 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
 
   // 草稿自动保存：停止输入 800ms 后写入本地；存储写满时只提醒一次
   useEffect(()=>{
-    const flush=()=>saveDraft(latestMarkdown.current,draftOwner);
+    const flush=()=>saveDraft(latestMarkdown.current);
     const beforeUnload=(event:BeforeUnloadEvent)=>{if(!flush()){event.preventDefault();event.returnValue='';}};
     window.addEventListener('beforeunload',beforeUnload);window.addEventListener('pagehide',flush);
     return()=>{window.removeEventListener('beforeunload',beforeUnload);window.removeEventListener('pagehide',flush);flush();};
-  },[draftOwner]);
+  },[]);
   const draftSaveFailedRef = useRef(false);
   useEffect(() => {
     setDraftSaveState('saving');
     const timer = window.setTimeout(() => {
-      const ok = saveDraft(markdown,draftOwner);
+      const ok = saveDraft(markdown);
       setDraftSaveState(ok ? 'saved' : 'error');
       if (!ok && !draftSaveFailedRef.current) {
         draftSaveFailedRef.current = true;
@@ -436,35 +304,33 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
       }
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [markdown,draftOwner]);
+  }, [markdown]);
 
   /** 整篇替换正文前先留一份快照，之后可以从「AI 工具」菜单撤销 */
   const replaceMarkdownWithUndo = (nextMarkdown: string, label: string) => {
     if (nextMarkdown === markdown) return;
     const snapshot = { label, markdown, savedAt: Date.now() };
     setUndoSnapshot(snapshot);
-    saveUndoSnapshot(snapshot,draftOwner);
+    saveUndoSnapshot(snapshot);
     setMarkdown(nextMarkdown);
   };
 
   const handleUndoReplace = () => {
     if (!undoSnapshot) return;
     // 撤销本身也可以再撤销回来
-    const reverse: UndoSnapshot = { label: `撤销「${undoSnapshot.label}」`, markdown:latestMarkdown.current, savedAt: Date.now(), article:loadArticleIdentity(draftOwner) };
-    const keys=draftKeys(draftOwner);
+    const reverse: UndoSnapshot = { label: `撤销「${undoSnapshot.label}」`, markdown:latestMarkdown.current, savedAt: Date.now() };
+    const keys=draftKeys();
     const writes=new Map([[keys.draft,undoSnapshot.markdown],[keys.undo,JSON.stringify(reverse)]] as Array<[string,string|null]>);
-    if(Object.prototype.hasOwnProperty.call(undoSnapshot,'article'))writes.set(keys.article,articleIdentityJson(undoSnapshot.article||null));
     try{atomicDraftWrite(localStorage,writes);}catch{pushToast('error','撤销失败','本机保存失败，当前正文保持原样。');return;}
     setMarkdown(undoSnapshot.markdown);
     setUndoSnapshot(reverse);
-    notifyArticleIdentity();
     pushToast('success', '已恢复', `已回到「${undoSnapshot.label}」之前的内容。`);
   };
 
   const handleExternalImport = (
     title: string,
     importedMarkdown: string,
-    sourceKind: 'feishu' | 'markdown' | 'plaintext' = 'feishu',
+    sourceKind: PendingArticleImport['sourceKind'],
   ) => {
     setPendingImport({title, markdown: importedMarkdown, sourceKind});
     setImportError('');
@@ -476,16 +342,13 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
     const current = latestMarkdown.current;
     const next = mode === 'append' && current.trim() ? current + '\n\n' + importedMarkdown : importedMarkdown;
     const snapshot = { label: mode === 'append' ? '导入追加' : '导入覆盖', markdown: current, savedAt: Date.now() };
-    const keys = draftKeys(draftOwner);
+    const keys = draftKeys();
     try { atomicDraftWrite(localStorage, new Map([[keys.undo, JSON.stringify(snapshot)], [keys.draft, next]])); }
     catch { setImportError('本机保存失败，未导入。请先导出当前正文，再重试。'); return; }
     setUndoSnapshot(snapshot);
     setMarkdown(next);
     setPendingImport(null);
-    setShowFeishuSidebar(false);
-    if (sourceKind === 'feishu') {
-      pushToast('success', '飞书文档已导入', title);
-    } else if (sourceKind === 'markdown') {
+    if (sourceKind === 'markdown') {
       pushToast('success', 'Markdown 文件已导入', title);
     } else {
       pushToast(
@@ -517,51 +380,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
       pushToast('error', '读取失败', '文件无法解析为文本,请确认编码为 UTF-8');
     };
     reader.readAsText(file, 'utf-8');
-  };
-
-  const handleSavePreset = () => {
-    if (!isRealAuth) {
-      pushToast('info', '当前模式不支持', 'OSS 调试模式下不启用云端预设保存。');
-      return;
-    }
-
-    if (!authUser) {
-      pushToast('info', '需要先登录', '登录后才能保存云端预设。');
-      navigate('/login', { state: { from: '/' } });
-      return;
-    }
-
-    setPresetNameInput('');
-    setShowPresetNameModal(true);
-  };
-
-  const handleConfirmSavePreset = async () => {
-    const name = presetNameInput.trim();
-    if (!name) return;
-
-    setIsSavingPreset(true);
-    try {
-      await savePreset(
-        name,
-        {
-          ...activeTheme,
-          emphasisConfig: activeEmphasis,
-          typographyConfig: activeTypography,
-          componentStyleConfig: activeComponentStyle,
-        },
-        activeLayoutStyle,
-        activeImageStyle,
-      );
-      const nextPresets = await fetchPresets();
-      setPresets(nextPresets);
-      setShowPresetNameModal(false);
-      setPresetNameInput('');
-      pushToast('success', '预设已保存', `“${name}” 已加入你的云端预设。`);
-    } catch (error: any) {
-      pushToast('error', '保存失败', error.message || '保存预设失败');
-    } finally {
-      setIsSavingPreset(false);
-    }
   };
 
   useEffect(() => () => {
@@ -696,15 +514,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
   };
 
   const handleAITypeset = async () => {
-    const access = getAiTypesetAccess();
-    if (!access.allowed) {
-      pushToast('info', '暂不可用', access.message);
-      if (access.reason === 'login_required' && isRealAuth) {
-        navigate('/login', { state: { from: '/' } });
-      }
-      return;
-    }
-
     if (!apiKey.trim()) {
       pushToast('info', '需要配置 API Key', '请先在工作台设置中配置个人 API Key。');
       setShowSettings(true);
@@ -750,15 +559,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
   };
 
   const handleIllustrationPlan = async () => {
-    const access = getIllustrationAccess();
-    if (!access.allowed) {
-      pushToast('info', '暂不可用', access.message);
-      if (access.reason === 'login_required' && isRealAuth) {
-        navigate('/login', { state: { from: '/' } });
-      }
-      return;
-    }
-
     setIsPlanningIllustration(true);
     try {
       const plan = await getIllustrationPlan({
@@ -778,49 +578,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
     } finally {
       setIsPlanningIllustration(false);
     }
-  };
-
-  const handlePresetSelect = (value: string) => {
-    if (!value) return;
-
-    if (value === 'save') {
-      handleSavePreset();
-      return;
-    }
-
-    if (value === 'login') {
-      navigate('/login', { state: { from: '/' } });
-      return;
-    }
-
-    if (value === 'mock-disabled') {
-      pushToast('info', '当前模式不支持', 'OSS 调试模式下不启用云端预设。');
-      return;
-    }
-
-    const preset = presets.find((item) => item.id === value);
-    if (!preset) return;
-
-    const presetTheme = preset.theme as unknown as Theme;
-    const presetLayoutStyle = preset.layout_style as unknown as LayoutStyle;
-    const presetImageStyle = preset.image_style as unknown as ImageStyle;
-    const hydratedTheme = {
-      ...(THEMES[presetTheme.id] || DEFAULT_THEME),
-      ...presetTheme,
-    };
-
-    setActiveTheme(hydratedTheme);
-    setActiveLayoutStyle(LAYOUT_STYLES[presetLayoutStyle.id] || presetLayoutStyle || DEFAULT_LAYOUT_STYLE);
-    setActiveImageStyle(IMAGE_STYLES[presetImageStyle.id] || presetImageStyle || DEFAULT_IMAGE_STYLE);
-    setActiveEmphasis(normalizeEmphasisConfig(
-      presetTheme.emphasisConfig,
-      hydratedTheme.emphasis || hydratedTheme.highlight,
-    ));
-    setActiveTypography(normalizeTypographyConfig(
-      presetTheme.typographyConfig,
-      presetLayoutStyle.id,
-    ));
-    setActiveComponentStyle(normalizeComponentStyleConfig(presetTheme.componentStyleConfig));
   };
 
   const handleThemeSelect = (theme: Theme) => {
@@ -978,15 +735,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
   const handleApplyIllustrationPlan = async () => {
     if (!illustrationPlan) return;
 
-    const access = getIllustrationAccess();
-    if (!access.allowed) {
-      pushToast('info', '暂不可用', access.message);
-      if (access.reason === 'login_required' && isRealAuth) {
-        navigate('/login', { state: { from: '/' } });
-      }
-      return;
-    }
-
     if (selectedIllustrationIds.length === 0) {
       pushToast('info', '请选择建议', '请至少保留一条配图建议。');
       return;
@@ -1024,54 +772,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
     }
   };
 
-  const dismissGuestRecovery = () => { setShowGuestRecovery(false); try {localStorage.setItem('gzh_guest_draft_dismissed:'+draftOwner,'1');}catch{/* A full store must not block editing. */} };
-  const recoverGuest = () => {
-    try {const recovered=restoreGuestDraft(draftOwner,latestMarkdown.current);setUndoSnapshot(recovered.undo);setMarkdown(recovered.markdown);dismissGuestRecovery();pushToast('success','访客草稿已恢复','当前正文已保留为可撤销快照，访客原稿仍保留。');}
-    catch(e){pushToast('error','恢复失败',e instanceof Error?e.message:'请先备份当前正文。');}
-  };
-  const handleLogout = () => {
-    if(!saveDraft(markdown,draftOwner)){pushToast('error','草稿保存失败','请先导出正文，再退出账号。');return;}
-    void logout();
-    setDevIdentityRole('guest');
-    setAuthUser(null);
-    setPresets([]);
-  };
-
-  const handleChangePassword = async () => {
-    if (!oldPassword || !newPassword) {
-      pushToast('error', '修改密码失败', '请填写旧密码和新密码。');
-      return;
-    }
-    if (newPassword !== confirmNewPassword) {
-      pushToast('error', '修改密码失败', '两次输入的新密码不一致。');
-      return;
-    }
-
-    setIsChangingPassword(true);
-    try {
-      await changePassword(oldPassword, newPassword);
-      pushToast('success', '密码已修改', '其他设备的登录状态已失效，本设备保持登录。');
-      setOldPassword('');
-      setNewPassword('');
-      setConfirmNewPassword('');
-    } catch (error: any) {
-      pushToast('error', '修改密码失败', error.message || '请稍后重试。');
-    } finally {
-      setIsChangingPassword(false);
-    }
-  };
-
-  const handleRefreshIllustrationJob = async () => {
-    if (!lastIllustrationJob || lastIllustrationJob.id.startsWith('oss-') || import.meta.env.VITE_APP_MODE !== 'online') return;
-
-    try {
-      const nextJob = await getIllustrationJob(lastIllustrationJob.id);
-      setLastIllustrationJob(nextJob);
-    } catch (error) {
-      console.error('刷新配图任务失败:', error);
-    }
-  };
-
   const handleApplyIllustrationResult = () => {
     if (!lastIllustrationJob?.resultMarkdown) return;
 
@@ -1092,10 +792,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
     localStorage.setItem('openai_model', apiModel);
 
     saveUploadMode(uploadMode);
-    saveR2Config({
-      workerUrl: r2WorkerUrl,
-      uploadSecret: r2UploadSecret,
-    });
     saveCdnConfig({
       uploadUrl: cdnUploadUrl,
       fieldName: cdnFieldName || 'file',
@@ -1121,17 +817,9 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
       <ToastStack items={toastItems} onDismiss={dismissToast} position="bottom" />
 
       <WorkbenchShell
-        onLeave={() => { const ok = saveDraft(markdown,draftOwner); if (!ok) pushToast('error', '草稿保存失败', '请先导出正文，再离开排版页面。'); return ok; }}
-        userName={authUser?.email.split('@')[0]}
-        userRole={authUser?.role}
-        realAuth={isRealAuth}
         draftState={draftSaveState}
-        onLogin={() => { if(!saveDraft(markdown,draftOwner)){pushToast('error','草稿保存失败','请先导出正文，再离开页面。');return;} navigate('/login', { state: { from: '/' } }); }}
-        onLogout={() => void handleLogout()}
         onSettings={() => setShowSettings(true)}
-        onConsole={() => { if(!saveDraft(markdown,draftOwner)){pushToast('error','草稿保存失败','请先导出正文，再离开页面。');return;} navigate('/admin'); }}
         onHelp={() => setShowCheatsheet(true)}
-        onVideo={() => { if(!saveDraft(markdown,draftOwner)){pushToast('error','草稿保存失败','请先导出正文，再离开页面。');return;} navigate('/video-compare'); }}
         toolbar={(<div className="wb-style-controls">
           <div className="flex items-center space-x-2 border-l border-gray-200 pl-4">
             <span className="mr-1 text-xs font-medium text-gray-400">主题</span>
@@ -1184,51 +872,9 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
             </select>
           </div>
 
-          <div className="flex items-center space-x-2 border-l border-gray-200 pl-4">
-            <select
-              className="w-36 cursor-pointer rounded-md border-none bg-gray-50 px-2 py-1 text-sm font-medium text-emerald-700 outline-none focus:ring-1 focus:ring-emerald-500"
-              defaultValue=""
-              aria-label="云端预设"
-              onChange={(event) => {
-                handlePresetSelect(event.target.value);
-                event.target.value = '';
-              }}
-            >
-              <option value="">我的预设</option>
-              {canUseCloudPresets ? (
-                <>
-                  <option value="save">保存当前组合...</option>
-                  {presets.length > 0 && (
-                    <optgroup label="已保存预设">
-                      {[...presets].reverse().map((preset) => (
-                        <option key={preset.id} value={preset.id}>
-                          {preset.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </>
-              ) : isRealAuth ? (
-                <option value="login">{accountsEnabled?'登录后使用云端预设':'云端预设 · 后续开放'}</option>
-              ) : (
-                <option value="mock-disabled">OSS 调试模式不启用云端预设</option>
-              )}
-            </select>
-          </div>
         </div>
 )}
         actions={(<>
-          {phaseTwoEnabled && <ArticleControls markdown={markdown} owner={draftOwner} onLogin={() => {
-            if (!saveDraft(latestMarkdown.current, draftOwner)) { pushToast('error', '草稿保存失败', '请先导出正文，再登录。'); return; }
-            navigate('/login', { state: { from: '/' } });
-          }} onLoad={(text,article) => {
-            const snapshot = { label: '载入已保存的文章', markdown: latestMarkdown.current, savedAt: Date.now(), article:loadArticleIdentity(draftOwner) };
-            const keys = draftKeys(draftOwner);
-            try { atomicDraftWrite(localStorage, new Map([[keys.undo, JSON.stringify(snapshot)], [keys.draft, text], [keys.article, articleIdentityJson(article)]])); }
-            catch { throw new Error('本机存储写入失败，未载入文章，请先导出当前正文。'); }
-            setUndoSnapshot(snapshot);
-            setMarkdown(text);
-          }}/>}
           <button className="wb-image-action flex items-center whitespace-nowrap" data-action="image-export" onClick={() => setShowImageExportPanel(true)}>
             <ImageDown className="mr-1.5 h-4 w-4" />导出图片
           </button>
@@ -1301,11 +947,10 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
         </>)}
       >
 
-      {guestRecoveryAvailable && showGuestRecovery && <div className="wb-draft-recovery" role="status"><div><strong>本浏览器保留了一份访客或旧版草稿</strong><p>可手动带入当前账号；原稿继续保留，当前正文可撤销恢复。</p></div><button onClick={recoverGuest}>恢复访客草稿</button><button onClick={dismissGuestRecovery}>暂不带入</button></div>}
       <main className="wb-editor-grid">
         <section className="wb-editor-pane">
           <div className="wb-pane-heading">
-            <span>Markdown 输入<small className="wb-draft-owner">{!accountsEnabled?'本机草稿 · 本浏览器':draftOwner==='guest'?'访客草稿 · 本浏览器':'当前账号草稿 · 本浏览器'}</small></span>
+            <span>Markdown 输入<small className="wb-draft-owner">本机草稿</small></span>
             <div className="wb-import-actions">
               <input
                 ref={fileInputRef}
@@ -1321,13 +966,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
               >
                 <FileText className="mr-1 h-3.5 w-3.5" />
                 本地
-              </button>
-              <button
-                onClick={() => accountsEnabled ? setShowFeishuSidebar(true) : pushToast('info','飞书导入后续开放','当前可使用本地文件导入。')}
-                className="flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700"
-              >
-                <Cloud className="mr-1 h-3.5 w-3.5" />
-                {accountsEnabled?'飞书':'飞书 · 后续开放'}
               </button>
               <button
                 onClick={() => setShowCheatsheet(true)}
@@ -1375,10 +1013,10 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
             <div className="wb-preview-settings">
               {previewTab === 'wechat' && (
                 <>
-                  <ArticleImages markdown={markdown} owner={draftOwner} onReplace={(expected,next)=>{
+                  <ArticleImages markdown={markdown} onReplace={(expected,next)=>{
                     if(latestMarkdown.current!==expected)throw Error('正文已变化，请重新选择图片');
                     const snapshot={label:'替换文章图片',markdown:expected,savedAt:Date.now()};
-                    const keys=draftKeys(draftOwner);
+                    const keys=draftKeys();
                     try{atomicDraftWrite(localStorage,new Map([[keys.undo,JSON.stringify(snapshot)],[keys.draft,next]]));}
                     catch{throw Error('本机保存失败，正文中的图片未替换，请先导出文章。');}
                     setUndoSnapshot(snapshot);setMarkdown(next);
@@ -1503,52 +1141,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
             <div className="mb-6 flex items-center justify-between gap-3"><h3 id="workbench-settings-title" className="text-xl font-bold text-gray-900">工作台设置</h3><button type="button" aria-label="关闭工作台设置" onClick={() => setShowSettings(false)} className="rounded-lg px-2 py-1 text-xl text-gray-500 hover:bg-gray-100">×</button></div>
 
             <UiSkinControl />
-            {guestRecoveryAvailable && <section className="wb-recovery-settings"><strong>本机草稿恢复</strong><p>访客及旧版草稿保留在本浏览器，可手动带入当前账号。</p><button onClick={()=>{recoverGuest();setShowSettings(false);}}>恢复访客草稿</button></section>}
-
-            {showDevIdentity && (
-              <div className="mb-5">
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">调试身份</label>
-                <DevIdentitySwitcher value={devIdentityRole} onChange={handleDevIdentityChange} />
-              </div>
-            )}
-
-            {canChangePassword && (
-              <div className="mb-5">
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">修改密码</label>
-                <div className="space-y-2">
-                  <input
-                    type="password"
-                    value={oldPassword}
-                    onChange={(event) => setOldPassword(event.target.value)}
-                    placeholder="旧密码"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
-                  />
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(event) => setNewPassword(event.target.value)}
-                    placeholder="新密码（至少 8 位，需包含字母和数字）"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
-                  />
-                  <input
-                    type="password"
-                    value={confirmNewPassword}
-                    onChange={(event) => setConfirmNewPassword(event.target.value)}
-                    placeholder="确认新密码"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
-                  />
-                  <div className="flex justify-end">
-                    <button
-                      onClick={handleChangePassword}
-                      disabled={isChangingPassword}
-                      className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-md transition-all hover:bg-emerald-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isChangingPassword ? '提交中…' : '确认修改'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
 
             <div className="mb-5 flex space-x-1 rounded-lg bg-gray-100 p-1">
               <button
@@ -1575,7 +1167,7 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
 
             {settingsTab === 'ai' && (
               <div className="mb-4 space-y-4">
-                <p className="text-sm leading-6 text-gray-500">个人 API：游客和登录用户均可使用。配置保存在当前浏览器，请求直接发送到你填写的服务商；调用费用由你的 API 账户承担。接口需支持浏览器跨域访问，HTTPS 网站请填写 HTTPS 接口。</p>
+                <p className="text-sm leading-6 text-gray-500">配置保存在本机，请求直接发送到你填写的服务商；调用费用由你的 API 账户承担。接口需支持跨域访问。</p>
                 <div>
                   <label htmlFor="personal-ai-key" className="mb-1 block text-sm font-medium text-gray-700">OpenAI 兼容 API Key</label>
                   <input
@@ -1620,7 +1212,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">上传模式</label>
                   <div className="flex space-x-1 rounded-lg bg-gray-100 p-1">
                     {([
-                      { key: 'r2' as UploadMode, label: '服务器图床' },
                       { key: 'custom' as UploadMode, label: '自定义 CDN' },
                       { key: 'base64' as UploadMode, label: 'Base64' },
                     ]).map((mode) => (
@@ -1638,36 +1229,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
                     ))}
                   </div>
                 </div>
-
-                {uploadMode === 'r2' && import.meta.env.VITE_API_SAME_ORIGIN === 'true' && (
-                  <p className="text-sm text-gray-500">{accountsEnabled?'图片保存到当前服务器，登录后即可上传。':'服务器图片上传后续开放，当前可使用其他图床或图片链接。'}</p>
-                )}
-                {uploadMode === 'r2' && import.meta.env.VITE_API_SAME_ORIGIN !== 'true' && (
-                  <>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
-                        后端地址 <span className="text-red-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={r2WorkerUrl}
-                        onChange={(event) => setR2WorkerUrl(event.target.value)}
-                        placeholder="https://your-worker.workers.dev"
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">Upload Secret</label>
-                      <input
-                        type="password"
-                        value={r2UploadSecret}
-                        onChange={(event) => setR2UploadSecret(event.target.value)}
-                        placeholder="可选，用于兼容旧的 Secret 模式"
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
-                      />
-                    </div>
-                  </>
-                )}
 
                 {uploadMode === 'custom' && (
                   <>
@@ -1782,23 +1343,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
         />
       )}
 
-      {showPresetNameModal && (
-        <InputPromptModal
-          title="保存云端预设"
-          description="给当前主题、版式和图片风格组合起一个容易辨认的名字。"
-          value={presetNameInput}
-          placeholder="例如：科技蓝图 / 阅读版"
-          confirmLabel="保存预设"
-          isSubmitting={isSavingPreset}
-          onChange={setPresetNameInput}
-          onConfirm={handleConfirmSavePreset}
-          onClose={() => {
-            if (isSavingPreset) return;
-            setShowPresetNameModal(false);
-            setPresetNameInput('');
-          }}
-        />
-      )}
       {illustrationPlan && (
         <IllustrationPlanModal
           plan={illustrationPlan}
@@ -1812,7 +1356,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
       {lastIllustrationJob && (
         <IllustrationJobPanel
           job={lastIllustrationJob}
-          onRefresh={import.meta.env.VITE_APP_MODE === 'online' && !lastIllustrationJob.id.startsWith('oss-') ? handleRefreshIllustrationJob : undefined}
           onApply={handleApplyIllustrationResult}
           isApplying={isApplyingIllustrationResult}
           onClose={() => setLastIllustrationJob(null)}
@@ -1825,11 +1368,6 @@ function TypesetterView({draftOwner}:{draftOwner:string}) {
           onClose={() => setShowImageExportPanel(false)}
         />
       )}
-      <FeishuSidebar
-        open={showFeishuSidebar}
-        onClose={() => setShowFeishuSidebar(false)}
-        onImport={(title, md) => handleExternalImport(title, md, 'feishu')}
-      />
     </div>
   );
 }
