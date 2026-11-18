@@ -1,0 +1,65 @@
+name: Windows installer
+
+on:
+  push:
+    branches: [development]
+    tags: ['desktop-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+        working-directory: app
+      - run: npm run package:win -- --publish never
+        working-directory: app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-installer
+          path: app/release/LuoboGzh-Setup-*-x64.exe
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-x64-installer
+          path: installer
+      - name: Publish installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          exe="installer/LuoboGzh-Setup-${TAG#desktop-v}-x64.exe"
+          test -s "$exe"
+          digest=$(sha256sum "$exe" | cut -d ' ' -f 1)
+          asset=$(basename "$exe")
+          printf 'Windows x64 安装包（未签名）。下载 EXE 后按安装向导操作。\n\nSHA-256: %s\n' "$digest" > notes.md
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+            remote=$(gh release view "$TAG" -R "$REPO" --json assets | jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .digest')
+            if [[ -z "$remote" ]]; then
+              gh release upload "$TAG" "$exe" -R "$REPO"
+            else
+              test "$remote" = "sha256:$digest"
+            fi
+            gh release edit "$TAG" -R "$REPO" --draft=false --notes-file notes.md
+          else
+            gh release create "$TAG" "$exe" -R "$REPO" --verify-tag --title "$TAG" --notes-file notes.md
+          fi
