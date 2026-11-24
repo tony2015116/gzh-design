@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { memo, useDeferredValue, useMemo, useRef } from 'react';
 import { parseMarkdownToJSON } from '../../core/parser';
 import { Title } from '../typesetter/Title';
 import { Subtitle } from '../typesetter/Subtitle';
@@ -29,6 +29,7 @@ import type { TypographyConfig } from '../../core/typography';
 import { DEFAULT_COMPONENT_STYLE_CONFIG } from '../../core/componentStyle';
 import type { ComponentStyleConfig } from '../../core/componentStyle';
 import type { BlockComponent } from '../../core/types';
+import { PREVIEW_PENDING_ATTR } from './previewSync';
 
 interface PreviewProps {
   markdown: string;
@@ -42,7 +43,7 @@ interface PreviewProps {
   elementId?: string;
 }
 
-export const Preview: React.FC<PreviewProps> = ({
+const PreviewInner: React.FC<PreviewProps> = ({
   markdown,
   elementId = 'wechat-article-preview',
   theme = DEFAULT_THEME,
@@ -52,9 +53,11 @@ export const Preview: React.FC<PreviewProps> = ({
   typography = DEFAULT_TYPOGRAPHY_CONFIG,
   componentStyle = DEFAULT_COMPONENT_STYLE_CONFIG,
 }) => {
+  // 打字时先响应输入框，长文解析放到低优先级渲染里，避免每次按键都卡住主线程
+  const deferredMarkdown = useDeferredValue(markdown);
   const components = useMemo(
-    () => parseMarkdownToJSON(markdown, theme, layoutStyle, emphasis),
-    [markdown, theme, layoutStyle, emphasis],
+    () => parseMarkdownToJSON(deferredMarkdown, theme, layoutStyle, emphasis),
+    [deferredMarkdown, theme, layoutStyle, emphasis],
   );
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -122,6 +125,7 @@ export const Preview: React.FC<PreviewProps> = ({
     <div 
       ref={previewRef}
       id={elementId}
+      {...(deferredMarkdown !== markdown ? { [PREVIEW_PENDING_ATTR]: '' } : {})}
       style={{
         maxWidth: '677px',
         margin: '0 auto',
@@ -140,3 +144,6 @@ export const Preview: React.FC<PreviewProps> = ({
     </div>
   );
 };
+
+// 工作台里与正文无关的状态（弹窗、提示、菜单）变化时不必重渲染整篇预览
+export const Preview = memo(PreviewInner);

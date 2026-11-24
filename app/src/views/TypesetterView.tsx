@@ -1,3 +1,4 @@
+import { errorMessage } from '../core/errors';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import {
@@ -33,11 +34,14 @@ import {
   type UndoSnapshot,
 } from '../services/draftStorage';
 import { Preview } from '../components/preview/Preview';
+import { waitForPreviewSettled } from '../components/preview/previewSync';
 import { buildWechatCopyRoot, copyWechatArticle } from '../core/wechatExport';
+import { writeRichTextToClipboard } from '../core/clipboard';
 import { CheatsheetModal } from '../components/ui/CheatsheetModal';
 import { HeaderMenu } from '../components/ui/HeaderMenu';
 import { IllustrationJobPanel } from '../components/ui/IllustrationJobPanel';
 import { IllustrationPlanModal } from '../components/ui/IllustrationPlanModal';
+import { useIllustration } from '../features/illustration/useIllustration';
 import { PlatformExportPanel } from '../components/ui/PlatformExportPanel';
 import { ImageExportPanel } from '../components/ui/ImageExportPanel';
 import { ToastStack, type ToastItem, type ToastTone } from '../components/ui/ToastStack';
@@ -73,12 +77,6 @@ import {
 import type { StyleScheme } from '../core/styleScheme';
 import { DEFAULT_THEME, THEMES } from '../core/theme';
 import type { Theme } from '../core/theme';
-import {
-  createIllustrationJob,
-  type IllustrationJob,
-  getIllustrationPlan,
-  type IllustrationPlan,
-} from '../services/illustrationService';
 import {
   loadCdnConfig,
   loadUploadMode,
@@ -208,9 +206,6 @@ function TypesetterView() {
       return '';
     }
   });
-  const [isPlanningIllustration, setIsPlanningIllustration] = useState(false);
-  const [isApplyingIllustration, setIsApplyingIllustration] = useState(false);
-  const [isApplyingIllustrationResult, setIsApplyingIllustrationResult] = useState(false);
   const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
   const [apiBaseUrl, setApiBaseUrl] = useState(localStorage.getItem('openai_api_base') || '');
   const [apiModel, setApiModel] = useState(localStorage.getItem('openai_model') || '');
@@ -233,9 +228,6 @@ function TypesetterView() {
   const [cdnHeaders, setCdnHeaders] = useState(savedCdn?.headers || '');
   const [cdnResponsePath, setCdnResponsePath] = useState(savedCdn?.responsePath || 'data.url');
 
-  const [illustrationPlan, setIllustrationPlan] = useState<IllustrationPlan | null>(null);
-  const [lastIllustrationJob, setLastIllustrationJob] = useState<IllustrationJob | null>(null);
-  const [selectedIllustrationIds, setSelectedIllustrationIds] = useState<string[]>([]);
   const [toastItems, setToastItems] = useState<ToastItem[]>([]);
   const [previewTab, setPreviewTab] = useState<'wechat' | 'xThread' | 'xArticle'>('wechat');
   const [xThreadExport, setXThreadExport] = useState<XThreadExport | null>(null);
@@ -314,6 +306,15 @@ function TypesetterView() {
     saveUndoSnapshot(snapshot);
     setMarkdown(nextMarkdown);
   };
+
+  const illustration = useIllustration({
+    markdown,
+    getLatestMarkdown: () => latestMarkdown.current,
+    layoutStyleId: activeLayoutStyle.id,
+    themeId: activeTheme.id,
+    replaceMarkdown: replaceMarkdownWithUndo,
+    notify: pushToast,
+  });
 
   const handleUndoReplace = () => {
     if (!undoSnapshot) return;
@@ -441,6 +442,7 @@ function TypesetterView() {
       pushToast('info', '请先打开公众号预览', '切换到公众号预览后，再复制排版内容。');
       return;
     }
+    await waitForPreviewSettled(element);
     const { root, issues } = buildWechatCopyRoot(element);
     if (issues.length) console.warn('[公众号兼容检查]', issues);
     const method = await copyWechatArticle(root);
@@ -472,26 +474,10 @@ function TypesetterView() {
     successTitle: string,
     successMessage: string,
   ) => {
-    try {
-      if (typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
-        const clipboardItem = new ClipboardItem({
-          'text/html': new Blob([html], { type: 'text/html' }),
-          'text/plain': new Blob([plain], { type: 'text/plain' }),
-        });
-        await navigator.clipboard.write([clipboardItem]);
-      } else {
-        await navigator.clipboard.writeText(plain);
-      }
-
-      pushToast('success', successTitle, successMessage);
-    } catch {
-      try {
-        await navigator.clipboard.writeText(plain);
-        pushToast('success', successTitle, `${successMessage}（已使用纯文本兼容模式）`);
-      } catch {
-        pushToast('error', '复制失败', '请重试，或检查浏览器剪贴板权限。');
-      }
-    }
+    const result = await writeRichTextToClipboard(html, plain);
+    if (result === 'html') pushToast('success', successTitle, successMessage);
+    else if (result === 'text') pushToast('info', '已复制纯文本', '当前环境未能写入富文本，剪贴板中不含格式。');
+    else pushToast('error', '复制失败', '请重试，或检查剪贴板权限。');
   };
 
   const handleCopyXThread = async () => {
@@ -535,7 +521,7 @@ function TypesetterView() {
     try {
       localStorage.setItem(FORMAT_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
       localStorage.setItem(FORMAT_CUSTOM_NOTE_STORAGE_KEY, customNote);
-    } catch {}
+    } catch { /* 偏好只是便利功能，存不下不影响本次排版 */ }
 
     setIsTypesetting(true);
     const original = markdown;
@@ -543,9 +529,9 @@ function TypesetterView() {
       const rawOutput = await getAITypesetMarkdown(apiKey.trim(), original, apiBaseUrl.trim(), apiModel.trim(), preferences, customNote);
       // 结果不直接落地：先给用户看对比和截断检查，确认后再替换
       setPendingAiResult({ original, analysis: analyzeAiTypesetOutput(original, rawOutput) });
-    } catch (error: any) {
+    } catch (error) {
       console.error('AI 排版失败:', error);
-      pushToast('error', 'AI 排版失败', error.message || '请稍后重试。');
+      pushToast('error', 'AI 排版失败', errorMessage(error, '请稍后重试。'));
     } finally {
       setIsTypesetting(false);
     }
@@ -556,28 +542,6 @@ function TypesetterView() {
     replaceMarkdownWithUndo(pendingAiResult.analysis.cleaned, 'AI 排版');
     setPendingAiResult(null);
     pushToast('success', 'AI 排版已采用', '如需恢复原文，可在「AI 工具」菜单中撤销。');
-  };
-
-  const handleIllustrationPlan = async () => {
-    setIsPlanningIllustration(true);
-    try {
-      const plan = await getIllustrationPlan({
-        markdown,
-        density: 'balanced',
-        preferredStyle: 'auto',
-        maxImages: 3,
-        layoutStyleId: activeLayoutStyle.id,
-        themeId: activeTheme.id,
-      });
-
-      setIllustrationPlan(plan);
-      setSelectedIllustrationIds(plan.items.map((item) => item.id));
-    } catch (error: any) {
-      console.error('智能配图建议失败:', error);
-      pushToast('error', '配图建议失败', error.message || '请稍后重试。');
-    } finally {
-      setIsPlanningIllustration(false);
-    }
   };
 
   const handleThemeSelect = (theme: Theme) => {
@@ -718,74 +682,6 @@ function TypesetterView() {
     pushToast('success', '方案已导出', `已导出 ${customStyleSchemes.length} 套个人方案。`);
   };
 
-  const handleToggleIllustrationItem = (id: string) => {
-    setSelectedIllustrationIds((current) => (
-      current.includes(id)
-        ? current.filter((itemId) => itemId !== id)
-        : [...current, id]
-    ));
-  };
-
-  const handleCloseIllustrationPlan = () => {
-    if (isApplyingIllustration) return;
-    setIllustrationPlan(null);
-    setSelectedIllustrationIds([]);
-  };
-
-  const handleApplyIllustrationPlan = async () => {
-    if (!illustrationPlan) return;
-
-    if (selectedIllustrationIds.length === 0) {
-      pushToast('info', '请选择建议', '请至少保留一条配图建议。');
-      return;
-    }
-
-    setIsApplyingIllustration(true);
-    try {
-      const job = await createIllustrationJob({
-        markdown,
-        plan: illustrationPlan,
-        selectedIds: selectedIllustrationIds,
-      });
-
-      if (job.status === 'completed' && job.resultMarkdown) {
-        replaceMarkdownWithUndo(job.resultMarkdown, '应用配图');
-      }
-      setLastIllustrationJob(job);
-      setIllustrationPlan(null);
-      setSelectedIllustrationIds([]);
-      if (job.status !== 'completed' || !job.resultMarkdown) {
-        pushToast('success', '配图任务已提交', '后台正在生成配图，完成后可在右下角面板中决定是否应用结果。');
-        return;
-      }
-      const sourceLabel = job.source === 'generated'
-        ? '真实生成'
-        : job.source === 'hybrid'
-          ? '混合生成'
-          : '占位回退';
-      pushToast('success', '配图已应用', `已应用 ${job.insertedCount} 张配图，当前结果为${sourceLabel}。`);
-    } catch (error: any) {
-      console.error('智能配图应用失败:', error);
-      pushToast('error', '配图应用失败', error.message || '请稍后重试。');
-    } finally {
-      setIsApplyingIllustration(false);
-    }
-  };
-
-  const handleApplyIllustrationResult = () => {
-    if (!lastIllustrationJob?.resultMarkdown) return;
-
-    setIsApplyingIllustrationResult(true);
-    try {
-      replaceMarkdownWithUndo(lastIllustrationJob.resultMarkdown, '应用配图');
-      pushToast('success', '结果已应用', `已将 ${lastIllustrationJob.insertedCount} 张配图写回正文。`);
-    } finally {
-      window.setTimeout(() => {
-        setIsApplyingIllustrationResult(false);
-      }, 160);
-    }
-  };
-
   const saveSettings = () => {
     localStorage.setItem('openai_api_key', apiKey.trim());
     localStorage.setItem('openai_api_base', apiBaseUrl);
@@ -892,10 +788,10 @@ function TypesetterView() {
               },
               {
                 key: 'illustration-plan',
-                label: isPlanningIllustration ? '分析配图中...' : '智能配图建议',
-                icon: <ImagePlus className={`mr-2 h-4 w-4 text-sky-600 ${isPlanningIllustration ? 'animate-pulse' : ''}`} />,
-                disabled: isPlanningIllustration,
-                onSelect: () => void handleIllustrationPlan(),
+                label: illustration.isPlanning ? '分析配图中...' : '智能配图建议',
+                icon: <ImagePlus className={`mr-2 h-4 w-4 text-sky-600 ${illustration.isPlanning ? 'animate-pulse' : ''}`} />,
+                disabled: illustration.isPlanning,
+                onSelect: () => void illustration.requestPlan(),
               },
               ...(undoSnapshot ? [{
                 key: 'undo-replace',
@@ -1343,23 +1239,18 @@ function TypesetterView() {
         />
       )}
 
-      {illustrationPlan && (
+      {illustration.plan && (
         <IllustrationPlanModal
-          plan={illustrationPlan}
-          selectedIds={selectedIllustrationIds}
-          isSubmitting={isApplyingIllustration}
-          onToggle={handleToggleIllustrationItem}
-          onConfirm={handleApplyIllustrationPlan}
-          onClose={handleCloseIllustrationPlan}
+          plan={illustration.plan}
+          selectedIds={illustration.selectedIds}
+          isSubmitting={illustration.isApplying}
+          onToggle={illustration.toggleItem}
+          onConfirm={illustration.applyPlan}
+          onClose={illustration.closePlan}
         />
       )}
-      {lastIllustrationJob && (
-        <IllustrationJobPanel
-          job={lastIllustrationJob}
-          onApply={handleApplyIllustrationResult}
-          isApplying={isApplyingIllustrationResult}
-          onClose={() => setLastIllustrationJob(null)}
-        />
+      {illustration.lastJob && (
+        <IllustrationJobPanel job={illustration.lastJob} onClose={illustration.closeLastJob} />
       )}
       {showImageExportPanel && (
         <ImageExportPanel

@@ -1,3 +1,4 @@
+import { errorMessage } from '../core/errors';
 import { ossChatCompletion, resolveChatEndpoint } from './chatCompletion';
 import { XHS_THEME_PACKS } from '../components/ui/XhsCard';
 import { XHS_STICKER_THEMES } from '../components/ui/XhsStickerCard';
@@ -133,6 +134,10 @@ const XHS_CARDS_PROMPT = `
 // 解析与校验：每个版式执行字数/条数硬上限，超限截断，非法卡片丢弃
 // ---------------------------------------------------------------------------
 
+// 模型返回的 JSON 未经校验，字段可能缺失或类型错误；只能经 cut / textList / typeof 判断后取值。
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ModelJson = any;
+
 const cut = (value: unknown, max: number): string =>
   typeof value === 'string' ? (value.length > max ? `${value.slice(0, max - 1)}…` : value) : '';
 
@@ -142,7 +147,7 @@ const textList = (value: unknown, maxItems: number, maxLen: number): string[] =>
 const labelDetails = (value: unknown, maxItems: number, labelMax: number, detailMax: number) =>
   Array.isArray(value)
     ? value
-        .map((v: any) => ({ label: cut(v?.label, labelMax), detail: cut(v?.detail, detailMax) }))
+        .map((v: ModelJson) => ({ label: cut(v?.label, labelMax), detail: cut(v?.detail, detailMax) }))
         .filter((v) => v.label)
         .slice(0, maxItems)
     : [];
@@ -157,7 +162,7 @@ const trimForFit = <T extends { label: string; detail: string }>(items: T[], lab
     detail: cut(it.detail, detailMax),
   }));
 
-const sanitizeCard = (raw: any): XhsCardSpec | null => {
+const sanitizeCard = (raw: ModelJson): XhsCardSpec | null => {
   if (!raw || typeof raw !== 'object') return null;
   const kicker = cut(raw.kicker, 14);
 
@@ -177,7 +182,7 @@ const sanitizeCard = (raw: any): XhsCardSpec | null => {
       const heading = cut(raw.heading, 14);
       const steps = Array.isArray(raw.steps)
         ? raw.steps
-            .map((s: any) => ({ title: cut(s?.title, 8), desc: cut(s?.desc, 16) }))
+            .map((s: ModelJson) => ({ title: cut(s?.title, 8), desc: cut(s?.desc, 16) }))
             .filter((s: { title: string }) => s.title)
             .slice(0, 3)
         : [];
@@ -200,7 +205,7 @@ const sanitizeCard = (raw: any): XhsCardSpec | null => {
       const heading = cut(raw.heading, 14);
       const rows: Array<{ label: string; value: string; pct: number }> = Array.isArray(raw.rows)
         ? raw.rows
-            .map((r: any) => ({
+            .map((r: ModelJson) => ({
               label: cut(r?.label, 5),
               value: cut(r?.value, 6),
               pct: typeof r?.pct === 'number' && Number.isFinite(r.pct) ? Math.max(0, r.pct) : 0,
@@ -241,27 +246,32 @@ const deriveFallbackCoverTitle = (markdown: string): string => {
 
   const raw = h1 || h2 || firstLine || '';
   // 只保留中英文数字，去掉 Markdown 装饰与标点尾巴
-  const cleaned = raw.replace(/[*_`~\[\]()!"'"'"—…·•\-—。，,.:：；;?？!！]+/g, ' ').trim();
+  const cleaned = raw.replace(/[*_`~[\]()!"'"'"—…·•\-—。，,.:：；;?？!！]+/g, ' ').trim();
   if (!cleaned) return '一篇值得读的文章';
   // 优先取头 8 个字符，若第一句已经是短标题就整句用
   return cleaned.length <= 12 ? cleaned : cleaned.slice(0, 12);
 };
 
 // AI 返回里最常见的三种 JSON 破损：代码围栏、尾随逗号、"//" 注释。
-// 全部本地救回，能救就不用再花一次调用。
+// 全部本地救回，能救就不用再花一次调用。先按标准 JSON 解析，
+// 失败才做容错处理：容错会删除 "//" 之后的内容，字符串里的网址也会受影响。
 const relaxedJsonParse = (raw: string): unknown => {
   const start = raw.indexOf('{');
   const end = raw.lastIndexOf('}');
   if (start < 0 || end <= start) throw new Error('no-json');
-  const stripped = raw
-    .slice(start, end + 1)
-    .replace(/,\s*([\]}])/g, '$1') // 尾随逗号
-    .replace(/\/\/[^\n\r]*/g, ''); // 行注释
-  return JSON.parse(stripped);
+  const body = raw.slice(start, end + 1);
+  try {
+    return JSON.parse(body);
+  } catch {
+    const stripped = body
+      .replace(/(^|[^:"'\\])\/\/[^\n\r]*/g, '$1') // 行注释（跳过 https:// 这类协议头）
+      .replace(/,\s*([\]}])/g, '$1'); // 尾随逗号
+    return JSON.parse(stripped);
+  }
 };
 
 export const parseXhsDeck = (content: string, markdown = ''): XhsDeck => {
-  let data: any;
+  let data: ModelJson;
   try {
     data = relaxedJsonParse(content);
   } catch {
@@ -361,8 +371,8 @@ export const generateXhsCards = async (markdown: string): Promise<XhsDeck> => {
   // 但 GPT 偶发 JSON 破损/摊薄的成本远高于让用户手动重试一次的沟通成本。
   try {
     return await requestAndParse(markdown);
-  } catch (err: any) {
-    const msg = String(err?.message || '');
+  } catch (err) {
+    const msg = errorMessage(err, '');
     const retriable = msg.includes('JSON') || msg.includes('太少');
     if (!retriable) throw err;
     return await requestAndParse(markdown);

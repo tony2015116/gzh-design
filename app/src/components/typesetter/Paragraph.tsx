@@ -9,7 +9,7 @@ interface ParagraphProps {
   layoutStyle?: LayoutStyle;
 }
 
-export const Paragraph: React.FC<ParagraphProps> = ({ content, theme: _theme, layoutStyle = DEFAULT_LAYOUT_STYLE }) => {
+export const Paragraph: React.FC<ParagraphProps> = ({ content, layoutStyle = DEFAULT_LAYOUT_STYLE }) => {
   const getStyle = () => {
     switch(layoutStyle.id) {
       case 'literary':

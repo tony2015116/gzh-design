@@ -53,7 +53,7 @@ md.inline.State.prototype.scanDelims = function (start: number, canSplitWord: bo
 };
 
 // override strong token to add WeChat inline styles based on layoutStyle
-md.renderer.rules.strong_open = (_tokens, _idx, _options, env, _self) => {
+md.renderer.rules.strong_open = (_tokens, _idx, _options, env) => {
   const highlight = env.theme?.highlight || '#FDE68A';
   const emphasisColor = env.emphasis?.color || env.theme?.emphasis || highlight;
   const emphasisStyleId = env.emphasis?.styleId || 'follow-layout';
@@ -102,7 +102,7 @@ md.renderer.rules.strong_close = () => {
   return '</strong>';
 };
 
-md.renderer.rules.code_inline = (tokens, idx, _options, env, _self) => {
+md.renderer.rules.code_inline = (tokens, idx, _options, env) => {
   const primary = env.theme?.primary || '#059669';
   const content = tokens[idx].content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   if (env.layoutStyle?.id === 'dark') {
@@ -111,7 +111,7 @@ md.renderer.rules.code_inline = (tokens, idx, _options, env, _self) => {
   return `<code style="background: #efefef; color: ${primary}; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 13px; margin: 0 2px;">${content}</code>`;
 };
 
-md.renderer.rules.link_open = (tokens, idx, _options, env, _self) => {
+md.renderer.rules.link_open = (tokens, idx, _options, env) => {
   const primary = env.theme?.primary || '#059669';
   const href = md.utils.escapeHtml(tokens[idx].attrGet('href') || '');
   return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color: ${primary}; text-decoration: none; border-bottom: 1px dashed ${primary}; outline: none; cursor: pointer;">`;
@@ -120,7 +120,7 @@ md.renderer.rules.link_close = () => {
   return `</a>`;
 };
 
-md.renderer.rules.em_open = (_tokens, _idx, _options, env, _self) => {
+md.renderer.rules.em_open = (_tokens, _idx, _options, env) => {
   const primary = env.theme?.primary || '#059669';
   return `<em style="color: ${primary}; font-style: italic; font-weight: 300;">`;
 };
@@ -432,7 +432,7 @@ export const parseMarkdownToJSON = (
 
       const isH1 = tag === 'h1';
       
-      let props: any = {};
+      let props: { num?: string; sub?: string; step?: string } = {};
       let mainContent = rawText;
 
       if (parts.length > 1) {
@@ -589,12 +589,12 @@ export const parseMarkdownToJSON = (
 
     if (token.type === 'table_open') {
        let headers: string[] = [];
-       let rows: string[][] = [];
+       const rows: string[][] = [];
        i++;
        while (i < tokens.length && tokens[i].type !== 'table_close') {
           if (tokens[i].type === 'tr_open') {
              let isHeader = false;
-             let rowData: string[] = [];
+             const rowData: string[] = [];
              i++;
              while (i < tokens.length && tokens[i].type !== 'tr_close') {
                 if (tokens[i].type === 'th_open') isHeader = true;

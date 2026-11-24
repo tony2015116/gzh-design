@@ -1,7 +1,6 @@
 import type { FormatPreferenceKey, FormatPreferenceLevel, FormatPreferences } from './formatPreferences';
 
 // 把用户自由输入的排版要求整理成结构化偏好：能识别的分句转成选项，识别不了的原样留作补充要求交给 AI。
-// 只在前端使用，Worker 不需要这份。
 
 const KEY_PATTERNS: [FormatPreferenceKey, RegExp][] = [
   ['divider', /分割线|分隔线|分隔符|分割符|分隔|分割|横线/],

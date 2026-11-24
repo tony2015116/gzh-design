@@ -30,6 +30,14 @@ npm ci
 npm run dev
 ```
 
+提交前检查（CI 也会执行，任一失败都不会打包 EXE）：
+
+```bash
+npx tsc -b
+npm run lint
+npm test
+```
+
 运行桌面版：
 
 ```bash

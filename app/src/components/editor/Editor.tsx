@@ -105,7 +105,7 @@ export const Editor: React.FC<EditorProps> = ({ value, onChange, editorRef, onSc
         const blob = await compressImageToBlob(file);
         const remoteUrl = await uploadFn(blob);
         replacePlaceholder(placeholder, `![图片](${remoteUrl})`);
-      } catch (err: any) {
+      } catch (err) {
         console.warn('Upload failed, falling back to base64:', err);
         replacePlaceholder(placeholder + '\n', '');
         handleBase64Fallback(file, textarea, start, end);
