@@ -1,3 +1,4 @@
+import { writeRichTextToClipboard, type ClipboardWriteResult } from './clipboard';
 // 公众号复制前的 DOM 预处理：网站「复制到公众号」和 skill 产物页共用这一份逻辑。
 import {
   extractCssVariables,
@@ -358,23 +359,10 @@ export function getWechatPlainText(root: HTMLElement): string {
   try { return content.innerText; } finally { host.remove(); }
 }
 
-export type WechatCopyMethod = 'selection' | 'html' | 'text' | 'failed';
+export type WechatCopyMethod = 'selection' | ClipboardWriteResult;
 export async function copyWechatArticle(root: HTMLElement): Promise<WechatCopyMethod> {
   if (copyWechatHtmlBySelection(root)) return 'selection';
-  const plain = getWechatPlainText(root);
-  if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
-    try {
-      await navigator.clipboard.write([new ClipboardItem({
-        'text/html': new Blob([root.innerHTML], { type: 'text/html' }),
-        'text/plain': new Blob([plain], { type: 'text/plain' }),
-      })]);
-      return 'html';
-    } catch { /* Use an explicitly labelled plain-text fallback. */ }
-  }
-  try {
-    await navigator.clipboard.writeText(plain);
-    return 'text';
-  } catch { return 'failed'; }
+  return await writeRichTextToClipboard(root.innerHTML, getWechatPlainText(root));
 }
 
 /** 用选区 + execCommand 复制：浏览器会按渲染结果生成富文本，公众号粘贴最稳 */

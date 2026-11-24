@@ -57,8 +57,6 @@ export interface IllustrationJobRequest {
   selectedIds: string[];
 }
 
-export type IllustrationJobStatus = 'queued' | 'running' | 'waiting' | 'completed' | 'failed';
-
 export interface IllustrationJobItem extends IllustrationPlanItem {
   imageKey?: string;
   imageUrl: string;
@@ -67,16 +65,12 @@ export interface IllustrationJobItem extends IllustrationPlanItem {
 
 export interface IllustrationJob {
   id: string;
-  status: IllustrationJobStatus;
-  source: 'pending' | 'placeholder' | 'generated' | 'hybrid' | 'oss_placeholder';
+  // 本机同步生成，返回时已全部完成
+  status: 'completed';
   insertedCount: number;
   resultMarkdown: string;
   items: IllustrationJobItem[];
   createdAt: string;
-  updatedAt?: string;
-  error?: string | null;
-  settings?: Record<string, unknown> | null;
-  summary?: Record<string, unknown> | null;
 }
 
 interface IllustrationHighlight {
@@ -1571,9 +1565,8 @@ async function createLocalIllustrationJob(request: IllustrationJobRequest): Prom
 
 
   return {
-    id: `oss-job-${Date.now()}`,
+    id: `local-job-${Date.now()}`,
     status: 'completed',
-    source: 'generated',
     insertedCount: items.length,
     resultMarkdown: insertIllustrationsIntoMarkdown(request.markdown, items),
     items,
