@@ -34,6 +34,7 @@ import {
   type UndoSnapshot,
 } from '../services/draftStorage';
 import { Preview } from '../components/preview/Preview';
+import { waitForPreviewSettled } from '../components/preview/previewSync';
 import { buildWechatCopyRoot, copyWechatArticle } from '../core/wechatExport';
 import { CheatsheetModal } from '../components/ui/CheatsheetModal';
 import { HeaderMenu } from '../components/ui/HeaderMenu';
@@ -442,6 +443,7 @@ function TypesetterView() {
       pushToast('info', '请先打开公众号预览', '切换到公众号预览后，再复制排版内容。');
       return;
     }
+    await waitForPreviewSettled(element);
     const { root, issues } = buildWechatCopyRoot(element);
     if (issues.length) console.warn('[公众号兼容检查]', issues);
     const method = await copyWechatArticle(root);

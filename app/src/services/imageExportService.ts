@@ -1,3 +1,4 @@
+import { waitForPreviewSettled } from '../components/preview/previewSync';
 import { toPng, toCanvas } from 'html-to-image';
 
 export interface ExportImageOptions {
@@ -12,6 +13,7 @@ export const generateLongImage = async (
   if (!element) {
     throw new Error('Preview element not found');
   }
+  await waitForPreviewSettled(element);
 
   try {
     return await toPng(element, { 
@@ -60,6 +62,7 @@ export const generateSlicedImages = async (
   if (!element) {
     throw new Error('Preview element not found');
   }
+  await waitForPreviewSettled(element);
 
   try {
     const canvas = await toCanvas(element, { 
