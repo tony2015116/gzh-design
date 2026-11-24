@@ -66,6 +66,7 @@ export const FORMAT_CUSTOM_NOTE_MAX_LENGTH = 200;
 export const sanitizeFormatCustomNote = (input: unknown): string => {
   if (typeof input !== 'string') return '';
   return input
+    // eslint-disable-next-line no-control-regex -- 有意剔除控制字符
     .replace(/[\u0000-\u001f\u007f]+/g, ' ')
     .replace(/[<>`「」]/g, '')
     .replace(/\s+/g, ' ')

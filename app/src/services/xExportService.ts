@@ -187,7 +187,7 @@ function splitSections(markdown: string): Section[] {
 
 function toSentences(value: string): string[] {
   return stripMarkdown(value)
-    .split(/(?<=[。！？!?\.])\s+|\n+/)
+    .split(/(?<=[。！？!?.])\s+|\n+/)
     .map((sentence) => sentence.trim())
     .filter(Boolean);
 }

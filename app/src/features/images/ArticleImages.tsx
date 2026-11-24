@@ -1,4 +1,4 @@
-import {useMemo,useRef,useState} from 'react';
+import {useMemo,useState} from 'react';
 import {Image,Link,RefreshCw} from 'lucide-react';
 import {Modal} from '../../components/ui/WorkspaceModal';
 import {findArticleImages,replaceArticleImage,type ArticleImage} from './imageReferences';
@@ -12,9 +12,9 @@ function ImageItem({image,onEdit}:{image:ArticleImage;onEdit:()=>void}){
 }
 export function ArticleImages({markdown,onReplace}:{markdown:string;onReplace:(expected:string,next:string)=>void}){
  const [open,setOpen]=useState(false),[selection,setSelection]=useState<{image:ArticleImage;source:string}|null>(null),[url,setUrl]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState('');
- const images=useMemo(()=>open?findArticleImages(markdown):[],[open,markdown]),latest=useRef(markdown);latest.current=markdown;
+ const images=useMemo(()=>open?findArticleImages(markdown):[],[open,markdown]);
  const replace=(target:{image:ArticleImage;source:string},newUrl:string)=>{
-  if(latest.current!==target.source)throw Error('正文已变化，请重新选择这张图片');
+  if(markdown!==target.source)throw Error('正文已变化，请重新选择这张图片');
   const next=replaceArticleImage(target.source,target.image,newUrl);onReplace(target.source,next);setSelection(null);setNotice('图片已替换，可在“AI 工具”撤销。');
  };
  return <>

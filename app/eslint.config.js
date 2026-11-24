@@ -20,4 +20,9 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // 这些卡片模块把主题数据和渲染组件放在一起；该规则只影响开发时热更新（退化为整页刷新），不影响打包产物。
+    files: ['src/components/ui/Xhs*Card.tsx', 'src/components/ui/CoverTemplate.tsx'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 ])

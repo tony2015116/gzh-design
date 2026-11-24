@@ -1,3 +1,4 @@
+import { errorMessage } from '../../core/errors';
 import { Download, Image as ImageIcon, Images, Layers, LayoutTemplate, Loader2, Sparkles, Wand2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { generateCoverCopy } from '../../ai/coverCopy';
@@ -159,8 +160,28 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
 
   useEffect(() => {
     if (activeMode === 'cover' || activeMode === 'cards') return;
-    generate();
-  }, [activeMode, sliceRatio]);
+    // 切换模式/比例时上一轮可能还没结束，只采用最后一次的结果
+    let cancelled = false;
+    setIsGenerating(true);
+    setError(null);
+    (async () => {
+      try {
+        // 让出一帧，先把加载状态画出来
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        const imgs = activeMode === 'long'
+          ? [await generateLongImage(elementId)]
+          : await generateSlicedImages(elementId, sliceRatio);
+        if (!cancelled) setImages(imgs);
+      } catch (e) {
+        if (cancelled) return;
+        setError(errorMessage(e, '生成图片失败'));
+        setImages([]);
+      } finally {
+        if (!cancelled) setIsGenerating(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeMode, sliceRatio, elementId]);
 
   // 渲染后测量每张卡片是否溢出（文字超出画布）。之前深度遍历会误报两类：
   //   (1) 绝对定位装饰（胶带/页脚/LED）
@@ -200,27 +221,6 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
     return () => clearTimeout(timer);
   }, [xhsDeck, cardSystem, stickerThemeId, minimalThemeId, workbenchThemeId, pulseThemeId, posterThemeId]);
 
-  const generate = async () => {
-    setIsGenerating(true);
-    setError(null);
-    try {
-      // Small timeout to allow UI to update (show spinner)
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      
-      if (activeMode === 'long') {
-        const img = await generateLongImage(elementId);
-        setImages([img]);
-      } else {
-        const imgs = await generateSlicedImages(elementId, sliceRatio);
-        setImages(imgs);
-      }
-    } catch (e: any) {
-      setError(e.message || '生成图片失败');
-      setImages([]);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   const downloadImage = (dataUrl: string, filename: string) => {
     const a = document.createElement('a');
@@ -246,8 +246,8 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
     try {
       const img = await generateCoverImage(coverCaptureRef.current);
       downloadImage(img, `xiaohongshu_cover_${Date.now()}.png`);
-    } catch (e: any) {
-      setError(e.message || '生成封面失败');
+    } catch (e) {
+      setError(errorMessage(e, '生成封面失败'));
     } finally {
       setIsDownloadingCover(false);
     }
@@ -260,8 +260,8 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
       const proposals = await generateCoverCopy(markdown ?? '');
       setCoverProposals(proposals);
       setAppliedProposalIndex(null);
-    } catch (e: any) {
-      setError(e.message || 'AI 封面方案生成失败');
+    } catch (e) {
+      setError(errorMessage(e, 'AI 封面方案生成失败'));
     } finally {
       setIsGeneratingCopy(false);
     }
@@ -289,8 +289,8 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
       else if (deck.system === 'workbench') setWorkbenchThemeId(deck.theme);
       else if (deck.system === 'pulse') setPulseThemeId(deck.theme);
       else if (deck.system === 'poster') setPosterThemeId(deck.theme);
-    } catch (e: any) {
-      setError(e.message || 'AI 图文生成失败');
+    } catch (e) {
+      setError(errorMessage(e, 'AI 图文生成失败'));
     } finally {
       setIsGeneratingDeck(false);
     }
@@ -326,8 +326,8 @@ export function ImageExportPanel({ elementId, markdown, onClose }: ImageExportPa
         // 避免浏览器拦截连续下载
         await new Promise((resolve) => setTimeout(resolve, 300));
       }
-    } catch (e: any) {
-      setError(e.message || '图文下载失败');
+    } catch (e) {
+      setError(errorMessage(e, '图文下载失败'));
     } finally {
       setIsDownloadingCards(false);
     }

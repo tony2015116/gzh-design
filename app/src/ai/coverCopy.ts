@@ -28,7 +28,11 @@ const COVER_COPY_PROMPT = `
 {"covers": [{"title": "...", "subtitle": "...", "template": "poster", "color": "#FF2442"}]}
 `;
 
-const extractJsonObject = (text: string): any => {
+// 模型返回的 JSON 未经校验，逐字段做 typeof / 白名单判断后再用。
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ModelJson = any;
+
+const extractJsonObject = (text: string): ModelJson => {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start < 0 || end <= start) {
@@ -42,7 +46,7 @@ export const parseCoverCopy = (content: string): CoverCopyProposal[] => {
   const covers = Array.isArray(data?.covers) ? data.covers : [];
 
   const proposals = covers
-    .map((item: any): CoverCopyProposal | null => {
+    .map((item: ModelJson): CoverCopyProposal | null => {
       const title = typeof item?.title === 'string' ? item.title.trim() : '';
       if (!title) return null;
       return {

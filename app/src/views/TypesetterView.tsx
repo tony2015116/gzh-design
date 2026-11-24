@@ -1,3 +1,4 @@
+import { errorMessage } from '../core/errors';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import {
@@ -535,7 +536,7 @@ function TypesetterView() {
     try {
       localStorage.setItem(FORMAT_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
       localStorage.setItem(FORMAT_CUSTOM_NOTE_STORAGE_KEY, customNote);
-    } catch {}
+    } catch { /* 偏好只是便利功能，存不下不影响本次排版 */ }
 
     setIsTypesetting(true);
     const original = markdown;
@@ -543,9 +544,9 @@ function TypesetterView() {
       const rawOutput = await getAITypesetMarkdown(apiKey.trim(), original, apiBaseUrl.trim(), apiModel.trim(), preferences, customNote);
       // 结果不直接落地：先给用户看对比和截断检查，确认后再替换
       setPendingAiResult({ original, analysis: analyzeAiTypesetOutput(original, rawOutput) });
-    } catch (error: any) {
+    } catch (error) {
       console.error('AI 排版失败:', error);
-      pushToast('error', 'AI 排版失败', error.message || '请稍后重试。');
+      pushToast('error', 'AI 排版失败', errorMessage(error, '请稍后重试。'));
     } finally {
       setIsTypesetting(false);
     }
@@ -572,9 +573,9 @@ function TypesetterView() {
 
       setIllustrationPlan(plan);
       setSelectedIllustrationIds(plan.items.map((item) => item.id));
-    } catch (error: any) {
+    } catch (error) {
       console.error('智能配图建议失败:', error);
-      pushToast('error', '配图建议失败', error.message || '请稍后重试。');
+      pushToast('error', '配图建议失败', errorMessage(error, '请稍后重试。'));
     } finally {
       setIsPlanningIllustration(false);
     }
@@ -764,9 +765,9 @@ function TypesetterView() {
           ? '混合生成'
           : '占位回退';
       pushToast('success', '配图已应用', `已应用 ${job.insertedCount} 张配图，当前结果为${sourceLabel}。`);
-    } catch (error: any) {
+    } catch (error) {
       console.error('智能配图应用失败:', error);
-      pushToast('error', '配图应用失败', error.message || '请稍后重试。');
+      pushToast('error', '配图应用失败', errorMessage(error, '请稍后重试。'));
     } finally {
       setIsApplyingIllustration(false);
     }
