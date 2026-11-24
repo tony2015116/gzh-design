@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 
-export type QuoteStyleId = 'follow-layout' | 'accent-line' | 'soft-card' | 'editorial';
+export type QuoteStyleId = 'follow-layout' | 'accent-line' | 'soft-card' | 'editorial' | 'spotlight';
 export type CardStyleId = 'follow-layout' | 'outline' | 'soft-fill' | 'accent-top';
 export type CodeStyleId = 'follow-layout' | 'light' | 'dark' | 'terminal';
 export type RadiusStyleId = 'follow-layout' | 'square' | 'subtle' | 'rounded' | 'soft' | 'large';
@@ -22,6 +22,7 @@ export const QUOTE_STYLE_OPTIONS: Array<{ id: QuoteStyleId; name: string }> = [
   { id: 'accent-line', name: '强调竖线' },
   { id: 'soft-card', name: '柔和浅卡' },
   { id: 'editorial', name: '杂志引语' },
+  { id: 'spotlight', name: '金句大字' },
 ];
 
 export const CARD_STYLE_OPTIONS: Array<{ id: CardStyleId; name: string }> = [

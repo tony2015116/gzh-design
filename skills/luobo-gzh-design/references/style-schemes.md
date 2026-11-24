@@ -2,7 +2,7 @@
 
 风格方案 = 版式 + 主题色 + 强调样式 + 字体字号 + 组件样式 的整套预设，和网站顶栏「风格方案」下拉里的完全一样。`--scheme` 只能用下面的 id 或中文名（或 `--scheme-file` 里的自定义方案）。
 
-## 六套方案
+## 九套方案
 
 | id | 中文名 | 版式 | 主题色 | 气质 | 适合 |
 |---|---|---|---|---|---|
@@ -12,16 +12,21 @@
 | `violet-tech` | 紫电科技 | 科技未来 | 皇家紫 | 等宽元素、深色引用、终端代码块 | 技术教程、产品发布、开发工具 |
 | `cherry-friendly` | 樱桃轻盈 | 活泼可爱 | 樱桃红 | 圆角、花朵符号、拍立得图片 | 清单好物、生活分享、亲子、轻松话题 |
 | `jade-classic` | 墨玉宋韵 | 古典中式 | 翠绿 | 宋体、居中标题、双线装饰 | 人文随笔、读书笔记、深度长文 |
+| `marketing-pop` | 爆款种草 | 商务极简 | 日落橙 | 荧光笔实色强调、16px 正文、金句大字 | 清单干货、种草、想要高转发的文章 |
+| `marketing-trust` | 专业信赖 | 商务极简 | 海蓝 | 冷静蓝、实色强调、顶部强调卡片、金句大字 | 行业分析、案例拆解、方法论、B 端内容 |
+| `marketing-story` | 走心故事 | 杂志风 | 樱桃红 | 宋体 16px、宽留白、色彩下划线、金句大字 | 个人经历、品牌故事、情感文 |
+
+三套营销方案的金句（`>` 引用）会渲染成居中大字，自带装饰引号，正文里不要再写引号；一篇用 1–2 句即可。
 
 ## 按文章类型推荐
 
 | 文章类型 | 首选 | 备选 | 反差款 |
 |---|---|---|---|
 | 教程 / 操作指南 | `violet-tech` | `jade-business` | `cherry-friendly` |
-| 清单 / 工具盘点 | `jade-business` | `cherry-friendly` | `ocean-editorial` |
+| 清单 / 工具盘点 | `jade-business` | `marketing-pop` | `cherry-friendly` |
 | 评测 / 对比 | `jade-business` | `amber-report` | `violet-tech` |
-| 观点 / 深度分析 | `ocean-editorial` | `jade-business` | `jade-classic` |
-| 心得 / 复盘 / 故事 | `jade-classic` | `ocean-editorial` | `amber-report` |
+| 观点 / 深度分析 | `ocean-editorial` | `marketing-trust` | `jade-classic` |
+| 心得 / 复盘 / 故事 | `jade-classic` | `marketing-story` | `amber-report` |
 | 资讯 / 快评 | `amber-report` | `jade-business` | `ocean-editorial` |
 
 拿不准就用 `jade-business`。

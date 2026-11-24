@@ -19,6 +19,21 @@ export const Quote: React.FC<QuoteProps> = ({
   layoutStyle = DEFAULT_LAYOUT_STYLE,
   componentStyle = DEFAULT_COMPONENT_STYLE_CONFIG,
 }) => {
+  // 金句大字：不装框、字号大于正文，做成读者愿意截图转发的视觉停顿点
+  if (componentStyle.quoteStyle === 'spotlight') {
+    const isDark = layoutStyle.id === 'dark';
+    return (
+      <section style={{ margin: '36px 8px 32px', textAlign: 'center' }}>
+        <section style={{ margin: '0 0 6px', fontSize: '44px', lineHeight: 1, height: '28px', color: theme.primary, fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 700 }}>“</section>
+        <section
+          style={{ margin: 0, fontSize: '18px', lineHeight: 1.7, fontWeight: 700, letterSpacing: '0.5px', color: isDark ? '#F1F5F9' : '#111827', fontFamily: 'var(--body-font-family)' }}
+          dangerouslySetInnerHTML={{ __html: content }}
+        />
+        <section style={{ width: '32px', height: '3px', margin: '16px auto 0', borderRadius: '2px', background: theme.primary }} />
+      </section>
+    );
+  }
+
   const customStyle = getQuoteStyleOverrides(componentStyle, theme.primary);
   const customTextStyle: React.CSSProperties = componentStyle.quoteStyle === 'follow-layout'
     ? {}
