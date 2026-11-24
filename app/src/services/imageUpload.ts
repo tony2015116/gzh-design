@@ -40,7 +40,7 @@ export function saveCdnConfig(config: CdnConfig): void {
 }
 
 /* ============================================================
- * Image Compression (front-end, saves R2 storage)
+ * Image Compression (front-end, keeps base64 drafts and uploads small)
  * ============================================================ */
 
 /**

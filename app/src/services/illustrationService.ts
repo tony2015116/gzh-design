@@ -1,9 +1,4 @@
 import { resolveChatEndpoint } from '../ai/chatCompletion';
-import {
-  createOssIllustrationTraceId,
-  getOssIllustrationLogPreview,
-  logOssIllustrationEvent,
-} from './ossIllustrationDebugLogger';
 
 export type IllustrationDensity = 'minimal' | 'balanced' | 'rich';
 export type IllustrationType =
@@ -965,22 +960,12 @@ async function requestStructuredSpecFromLocalModel(
   fallback: IllustrationStructuredSpec,
 ): Promise<IllustrationStructuredSpec | null> {
   const { apiKey, baseUrl, model } = getLocalAiConfig();
-  const traceId = createOssIllustrationTraceId();
   if (!apiKey) return null;
   if (item.engine !== 'html_infographic') return null;
 
   const endpoint = resolveChatEndpoint(baseUrl);
 
   const context = extractStructuredSectionContext(markdown, item);
-  await logOssIllustrationEvent(traceId, 'structured_spec.request.started', {
-    type: item.type,
-    engine: item.engine,
-    model,
-    heading: context.heading,
-    contentPreview: getOssIllustrationLogPreview(context.content),
-    bulletPoints: context.bulletPoints.slice(0, 4),
-    sentencePoints: context.sentencePoints.slice(0, 4),
-  }, 'verbose');
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
@@ -1062,10 +1047,6 @@ Rules:
   const text = data?.choices?.[0]?.message?.content || '';
   const jsonText = extractJsonObject(text);
   if (!jsonText) {
-    await logOssIllustrationEvent(traceId, 'structured_spec.request.empty', {
-      type: item.type,
-      outputPreview: getOssIllustrationLogPreview(text),
-    }, 'verbose');
     return null;
   }
 
@@ -1073,45 +1054,10 @@ Rules:
     const result = sanitizeStructuredSpecCandidate(JSON.parse(jsonText), fallback, item);
     const quality = assessStructuredSpecQuality(item, context, result);
     if (!quality.accepted) {
-      await logOssIllustrationEvent(traceId, 'structured_spec.request.rejected', {
-        type: item.type,
-        score: quality.score,
-        reasons: quality.reasons,
-        keywords: quality.keywords,
-        matchedKeywords: quality.matchedKeywords,
-        title: result.title,
-      }, 'verbose');
       return null;
     }
-    await logOssIllustrationEvent(traceId, 'structured_spec.request.succeeded', {
-      type: item.type,
-      score: quality.score,
-      matchedKeywords: quality.matchedKeywords,
-      title: result.title,
-      subtitle: result.subtitle,
-      takeaway: result.takeaway,
-      layout: result.layout,
-      specPreview: getOssIllustrationLogPreview(JSON.stringify({
-        highlights: result.highlights.slice(0, 3),
-        comparison: result.comparison ? {
-          left: result.comparison.left.title,
-          right: result.comparison.right.title,
-        } : null,
-        bridge: result.bridge,
-        flowSteps: result.flow?.steps?.slice(0, 4) || [],
-        framework: result.framework ? {
-          core: result.framework.core,
-          pillars: result.framework.pillars.slice(0, 4),
-        } : null,
-        timeline: result.timeline.slice(0, 4),
-      })),
-    }, 'verbose');
     return result;
   } catch {
-    await logOssIllustrationEvent(traceId, 'structured_spec.request.invalid_json', {
-      type: item.type,
-      outputPreview: getOssIllustrationLogPreview(jsonText),
-    }, 'verbose');
     return null;
   }
 }
@@ -1121,25 +1067,14 @@ async function buildStructuredSpecWithLocalModel(
   markdown: string,
 ): Promise<IllustrationStructuredSpec> {
   const fallback = buildStructuredSpec(item, markdown);
-  const traceId = createOssIllustrationTraceId();
 
   try {
     const fromModel = await requestStructuredSpecFromLocalModel(item, markdown, fallback);
     if (!fromModel) {
-      await logOssIllustrationEvent(traceId, 'structured_spec.fallback.heuristic', {
-        type: item.type,
-        layout: fallback.layout,
-        title: fallback.title,
-        subtitle: fallback.subtitle,
-        takeaway: fallback.takeaway,
-      }, 'verbose');
       return fallback;
     }
     return sanitizeStructuredSpecCandidate(fromModel, fallback, item);
   } catch {
-    await logOssIllustrationEvent(traceId, 'structured_spec.fallback.error', {
-      type: item.type,
-    }, 'verbose');
     return fallback;
   }
 }
@@ -1611,7 +1546,6 @@ function insertIllustrationsIntoMarkdown(markdown: string, items: IllustrationJo
 }
 
 async function createLocalIllustrationJob(request: IllustrationJobRequest): Promise<IllustrationJob> {
-  const traceId = createOssIllustrationTraceId();
   const selectedItems = request.plan.items
     .filter((item) => request.selectedIds.includes(item.id))
     .sort((left, right) => left.priority - right.priority)
@@ -1621,16 +1555,6 @@ async function createLocalIllustrationJob(request: IllustrationJobRequest): Prom
     throw new Error('请至少选择一条配图建议。');
   }
 
-  await logOssIllustrationEvent(traceId, 'job.request.received', {
-    selectedCount: selectedItems.length,
-    markdownPreview: getOssIllustrationLogPreview(request.markdown),
-    items: selectedItems.map((item) => ({
-      anchorLabel: item.anchorLabel,
-      type: item.type,
-      engine: item.engine,
-      style: item.style,
-    })),
-  });
 
   const items: IllustrationJobItem[] = await Promise.all(selectedItems.map(async (item) => {
     const structuredSpec = item.engine === 'html_infographic'
@@ -1645,14 +1569,6 @@ async function createLocalIllustrationJob(request: IllustrationJobRequest): Prom
     };
   }));
 
-  await logOssIllustrationEvent(traceId, 'job.request.completed', {
-    insertedCount: items.length,
-    items: items.map((item) => ({
-      anchorLabel: item.anchorLabel,
-      type: item.type,
-      engine: item.engine,
-    })),
-  }, 'verbose');
 
   return {
     id: `oss-job-${Date.now()}`,
