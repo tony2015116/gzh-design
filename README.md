@@ -6,9 +6,20 @@
 
 ## Windows 安装
 
-本地已生成 `app/release/LuoboGzh-Setup-0.1.0-x64.exe`（约 115 MiB）。GitHub Releases 的 `desktop-v0.1.0` 目前是草稿，附件上传返回 HTTP 401，暂无公开下载地址。
+从 [Releases](https://github.com/tony2015116/gzh-design/releases) 下载最新的 `LuoboGzh-Setup-<版本>-x64.exe`，在 Windows x64 上双击运行，按向导选择安装目录，然后从开始菜单打开「公众号排版工作台」。安装包自带 Electron 运行时，无需另外安装 Node.js。安装包未签名，Windows 可能提示“未知发布者”，选择“仍要运行”即可。新版本直接覆盖安装，草稿和设置会保留。
 
-取得安装包后，在 Windows x64 上双击运行，按向导选择安装目录，然后从开始菜单打开「公众号排版工作台」。安装包自带 Electron 运行时，无需另外安装 Node.js。安装包未签名，已通过归档完整性检查。核心功能已在 Linux Electron 桌面环境测试，Windows 实装仍待验证。
+## 发布新版本
+
+推送到 `development` 或提交 PR 时，CI 会检查并打包，安装包在对应 Actions 运行页面的 Artifacts 里，不会发布 Release。
+
+要发布 Release，推送 `desktop-v` 开头的标签，版本号取自标签，无需修改 `package.json`：
+
+```bash
+git tag desktop-v0.2.0
+git push origin desktop-v0.2.0
+```
+
+版本号要比上一次大，安装时才会识别为升级。
 
 ## 仓库中的 Skill
 

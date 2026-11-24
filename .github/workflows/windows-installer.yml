@@ -34,6 +34,8 @@ jobs:
   build:
     needs: check
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,6 +45,21 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci
         working-directory: app
+      # 打 desktop-v* 标签时用标签里的版本（不必先改 package.json）；其余构建用 主.次 版本 + 运行序号，便于区分
+      - name: Set version
+        id: version
+        shell: bash
+        working-directory: app
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/desktop-v* ]]; then
+            version="${GITHUB_REF_NAME#desktop-v}"
+          else
+            base=$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")
+            version="$base.$GITHUB_RUN_NUMBER"
+          fi
+          npm version "$version" --no-git-tag-version --allow-same-version
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - run: npm run package:win -- --publish never
         working-directory: app
       - uses: actions/upload-artifact@v4
@@ -52,6 +69,7 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
+  # 只有推送 desktop-v* 标签时才发布；推送 development 和 PR 只构建，安装包在 Actions 的 Artifacts 里
   release:
     if: startsWith(github.ref, 'refs/tags/desktop-v')
     needs: build
@@ -67,14 +85,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.build.outputs.version }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          exe="installer/LuoboGzh-Setup-${TAG#desktop-v}-x64.exe"
+          TAG="desktop-v$VERSION"
+          exe="installer/LuoboGzh-Setup-$VERSION-x64.exe"
           test -s "$exe"
           digest=$(sha256sum "$exe" | cut -d ' ' -f 1)
           asset=$(basename "$exe")
-          printf 'Windows x64 安装包（未签名）。下载 EXE 后按安装向导操作。\n\nSHA-256: %s\n' "$digest" > notes.md
+          printf 'Windows x64 安装包（未签名）。下载 EXE 后按安装向导操作。\n\n提交：%s\nSHA-256: %s\n' "${SHA:0:7}" "$digest" > notes.md
           if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
             remote=$(gh release view "$TAG" -R "$REPO" --json assets | jq -r --arg name "$asset" '.assets[] | select(.name == $name) | .digest')
             if [[ -z "$remote" ]]; then
@@ -84,5 +104,5 @@ jobs:
             fi
             gh release edit "$TAG" -R "$REPO" --draft=false --notes-file notes.md
           else
-            gh release create "$TAG" "$exe" -R "$REPO" --verify-tag --title "$TAG" --notes-file notes.md
+            gh release create "$TAG" "$exe" -R "$REPO" --verify-tag --title "$TAG" --notes-file notes.md --latest
           fi
