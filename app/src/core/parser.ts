@@ -24,6 +24,12 @@ const isCjkPunct = (code: number) =>
   (code >= 0x2018 && code <= 0x201f) || // “”‘’
   code === 0x2026 || code === 0x2014; // … —
 
+const isCjk = (code: number) =>
+  isCjkPunct(code) ||
+  (code >= 0x3400 && code <= 0x4dbf) || // 扩展 A
+  (code >= 0x4e00 && code <= 0x9fff) || // 常用汉字
+  (code >= 0xf900 && code <= 0xfaff); // 兼容汉字
+
 const { isWhiteSpace, isPunctChar, isMdAsciiPunct } = md.utils;
 md.inline.State.prototype.scanDelims = function (start: number, canSplitWord: boolean) {
   const max = this.posMax;
@@ -42,8 +48,9 @@ md.inline.State.prototype.scanDelims = function (start: number, canSplitWord: bo
   const isLastWhiteSpace = isWhiteSpace(lastChar);
   const isNextWhiteSpace = isWhiteSpace(nextChar);
 
-  const leftFlanking = !isNextWhiteSpace && (!isNextPunctChar || isLastWhiteSpace || isLastPunctChar);
-  const rightFlanking = !isLastWhiteSpace && (!isLastPunctChar || isNextWhiteSpace || isNextPunctChar);
+  // 挨着中文时，中文字符等同于“词边界”：`**提升了 12%**。`、`约**30%**的人` 这类以半角符号收尾的加粗才能闭合
+  const leftFlanking = !isNextWhiteSpace && (!isNextPunctChar || isLastWhiteSpace || isLastPunctChar || isCjk(lastChar));
+  const rightFlanking = !isLastWhiteSpace && (!isLastPunctChar || isNextWhiteSpace || isNextPunctChar || isCjk(nextChar));
 
   return {
     can_open: leftFlanking && (canSplitWord || !rightFlanking || isLastPunctChar),
